@@ -20,8 +20,10 @@ name: Build .NET Solution
 on:
   push:
     branches: [ master ]
+    tags: [ v*.*.* ]
   pull_request:
     branches: [ master ]
+
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
