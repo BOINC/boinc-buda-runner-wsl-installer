@@ -21,6 +21,7 @@ namespace boinc_buda_runner_wsl_installer
 {
     public enum ID
     {
+        ApplicationUpdate,
         WindowsVersion,
         WindowsFeatures,
         WslCheck,

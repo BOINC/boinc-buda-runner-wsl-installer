@@ -15,8 +15,15 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with BOINC.  If not, see <http://www.gnu.org/licenses/>.
 
+using System;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
+using System.IO;
 using System.Linq;
+using System.Net;
+using System.Net.Http;
+using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -32,6 +39,7 @@ namespace boinc_buda_runner_wsl_installer
             InitializeComponent();
             TableItems = new ObservableCollection<TableRow>
             {
+                new TableRow { Id = ID.ApplicationUpdate, Icon = "", Status = "Check installer update" },
                 new TableRow { Id = ID.WindowsVersion, Icon = "", Status = "Check Windows version" },
                 new TableRow { Id = ID.WindowsFeatures, Icon = "", Status = "Check Windows features" },
                 new TableRow { Id = ID.WslCheck, Icon = "", Status = "Check WSL installation" },
@@ -447,6 +455,24 @@ namespace boinc_buda_runner_wsl_installer
             DebugLogger.LogSeparator("Installation Process Started");
             DebugLogger.LogMethodStart("InstallButton_Click", component: "MainWindow");
 
+            // First, ensure this installer is the latest version and restart if it was updated
+            try
+            {
+                ChangeRowIconAndStatus(ID.ApplicationUpdate, "BlueInfoIcon", "Checking for installer updates...");
+                await Task.Delay(50);
+                var updateTriggered = await CheckAndUpdateSelfAsync();
+                if (updateTriggered)
+                {
+                    DebugLogger.LogInfo("Update triggered, stopping further processing", "MainWindow");
+                    return; // The app will close; updater will restart the new version
+                }
+            }
+            catch (Exception ex)
+            {
+                ChangeRowIconAndStatus(ID.ApplicationUpdate, "YellowExclamationIcon", "Could not check for installer updates");
+                DebugLogger.LogException(ex, "Self-update check failed (continuing without update)", "MainWindow");
+            }
+
             // Show confirmation dialog
             var result = MessageBox.Show(
                 "This will install BOINC BUDA Runner with WSL support on your system.\n\nDo you want to continue?",
@@ -591,6 +617,225 @@ namespace boinc_buda_runner_wsl_installer
             {
                 DebugLogger.LogWarning($"Could not find table row with ID: {id}", "MainWindow");
             }
+        }
+
+        // --- Self-update logic (lightweight JSON parsing) ---
+        private static string ExtractJsonString(string json, string propertyName)
+        {
+            if (string.IsNullOrEmpty(json) || string.IsNullOrEmpty(propertyName)) return null;
+            var pattern = $"\"{Regex.Escape(propertyName)}\"\\s*:\\s*\"([^\\\"]*)\"";
+            var m = Regex.Match(json, pattern, RegexOptions.IgnoreCase | RegexOptions.Singleline);
+            return m.Success ? m.Groups[1].Value : null;
+        }
+
+        private static string FindFirstExeDownloadUrl(string json)
+        {
+            if (string.IsNullOrEmpty(json)) return null;
+            var matches = Regex.Matches(json, "\"browser_download_url\"\\s*:\\s*\"([^\\\"]+)\"", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+            foreach (Match m in matches)
+            {
+                var url = m.Groups[1].Value;
+                if (url.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+                {
+                    return url;
+                }
+            }
+            return null;
+        }
+
+        private static Version TryParseVersionFromTag(string tag)
+        {
+            if (string.IsNullOrWhiteSpace(tag)) return null;
+            var s = tag.Trim();
+            if (s.StartsWith("v", StringComparison.OrdinalIgnoreCase)) s = s.Substring(1);
+
+            // Remove any suffix like -beta, -rc1, etc.
+            int dash = s.IndexOf('-');
+            if (dash > 0) s = s.Substring(0, dash);
+
+            try
+            {
+                // Ensure at least Major.Minor
+                var parts = s.Split('.');
+                int major = 0, minor = 0, build = 0, revision = 0;
+                if (parts.Length > 0) int.TryParse(new string(parts[0].TakeWhile(char.IsDigit).ToArray()), out major);
+                if (parts.Length > 1) int.TryParse(new string(parts[1].TakeWhile(char.IsDigit).ToArray()), out minor);
+                if (parts.Length > 2) int.TryParse(new string(parts[2].TakeWhile(char.IsDigit).ToArray()), out build);
+                if (parts.Length > 3) int.TryParse(new string(parts[3].TakeWhile(char.IsDigit).ToArray()), out revision);
+
+                if (parts.Length >= 4) return new Version(major, minor, build, revision);
+                if (parts.Length == 3) return new Version(major, minor, build);
+                return new Version(major, minor);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static Version TryGetCurrentFileVersion(string exePath)
+        {
+            try
+            {
+                var fvi = FileVersionInfo.GetVersionInfo(exePath);
+                var verStr = fvi.FileVersion ?? fvi.ProductVersion;
+                if (string.IsNullOrWhiteSpace(verStr)) return null;
+                // Normalize similar to tag parsing
+                var dash = verStr.IndexOf('-');
+                if (dash > 0) verStr = verStr.Substring(0, dash);
+                Version v;
+                if (Version.TryParse(verStr, out v)) return v;
+            }
+            catch { }
+            return null;
+        }
+
+        private async Task<bool> CheckAndUpdateSelfAsync()
+        {
+            DebugLogger.LogMethodStart("CheckAndUpdateSelfAsync", component: "MainWindow");
+
+            try
+            {
+                // Ensure TLS 1.2 for GitHub API
+                try { ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12; } catch { }
+
+                using (var http = new HttpClient())
+                {
+                    http.DefaultRequestHeaders.UserAgent.ParseAdd("boinc-buda-runner-wsl-installer/1.0 (+https://github.com/BOINC/boinc-buda-runner-wsl-installer)");
+                    var apiUrl = "https://api.github.com/repos/BOINC/boinc-buda-runner-wsl-installer/releases/latest";
+                    DebugLogger.LogConfiguration("GitHub Releases API URL", apiUrl, "MainWindow");
+
+                    using (var resp = await http.GetAsync(apiUrl))
+                    {
+                        if (!resp.IsSuccessStatusCode)
+                        {
+                            ChangeRowIconAndStatus(ID.ApplicationUpdate, "YellowExclamationIcon", "Could not check for installer updates");
+                            DebugLogger.LogWarning($"GitHub release check failed: {(int)resp.StatusCode} {resp.ReasonPhrase}", "MainWindow");
+                            DebugLogger.LogMethodEnd("CheckAndUpdateSelfAsync", "false (api error)", "MainWindow");
+                            return false; // Continue without update
+                        }
+
+                        var json = await resp.Content.ReadAsStringAsync();
+                        var latestTag = ExtractJsonString(json, "tag_name");
+                        var downloadUrl = FindFirstExeDownloadUrl(json);
+                        if (string.IsNullOrWhiteSpace(downloadUrl))
+                        {
+                            ChangeRowIconAndStatus(ID.ApplicationUpdate, "YellowExclamationIcon", "No installer binary found in the latest release");
+                            DebugLogger.LogWarning("No executable asset found in latest GitHub release", "MainWindow");
+                            DebugLogger.LogMethodEnd("CheckAndUpdateSelfAsync", "false (no exe asset)", "MainWindow");
+                            return false;
+                        }
+
+                        var latestVersion = TryParseVersionFromTag(latestTag);
+                        var exePath = Process.GetCurrentProcess().MainModule.FileName;
+                        var currentVersion = TryGetCurrentFileVersion(exePath);
+
+                        DebugLogger.LogConfiguration("Current EXE Path", exePath, "MainWindow");
+                        DebugLogger.LogConfiguration("Current Version", currentVersion != null ? currentVersion.ToString() : "unknown", "MainWindow");
+                        DebugLogger.LogConfiguration("Latest Tag", latestTag ?? "null", "MainWindow");
+                        DebugLogger.LogConfiguration("Latest Version Parsed", latestVersion != null ? latestVersion.ToString() : "unknown", "MainWindow");
+                        DebugLogger.LogConfiguration("Download URL", downloadUrl, "MainWindow");
+
+                        bool shouldUpdate = false;
+                        if (latestVersion != null && currentVersion != null)
+                        {
+                            shouldUpdate = latestVersion > currentVersion;
+                        }
+                        else if (currentVersion == null && latestVersion != null)
+                        {
+                            shouldUpdate = true;
+                        }
+
+                        if (!shouldUpdate)
+                        {
+                            ChangeRowIconAndStatus(ID.ApplicationUpdate, "GreenCheckboxIcon", "Installer is up to date");
+                            DebugLogger.LogInfo("Application is up to date; no update required", "MainWindow");
+                            DebugLogger.LogMethodEnd("CheckAndUpdateSelfAsync", "false (up to date)", "MainWindow");
+                            return false;
+                        }
+
+                        // Download the new executable next to current exe
+                        ChangeRowIconAndStatus(ID.ApplicationUpdate, "BlueInfoIcon", "Downloading installer update...");
+                        var exeDir = Path.GetDirectoryName(exePath);
+                        var tempExePath = Path.Combine(exeDir ?? ".", "installer_update.tmp.exe");
+                        DebugLogger.LogConfiguration("Temp EXE Path", tempExePath, "MainWindow");
+
+                        using (var downloadResp = await http.GetAsync(downloadUrl))
+                        {
+                            if (!downloadResp.IsSuccessStatusCode)
+                            {
+                                ChangeRowIconAndStatus(ID.ApplicationUpdate, "RedCancelIcon", "Failed to download installer update");
+                                DebugLogger.LogError($"Failed to download latest installer: {(int)downloadResp.StatusCode} {downloadResp.ReasonPhrase}", "MainWindow");
+                                DebugLogger.LogMethodEnd("CheckAndUpdateSelfAsync", "false (download error)", "MainWindow");
+                                return false;
+                            }
+
+                            using (var fs = new FileStream(tempExePath, FileMode.Create, FileAccess.Write, FileShare.None))
+                            {
+                                await downloadResp.Content.CopyToAsync(fs);
+                            }
+                        }
+
+                        // Prepare updater batch file
+                        ChangeRowIconAndStatus(ID.ApplicationUpdate, "BlueInfoIcon", "Preparing restart to finish update...");
+                        var batPath = Path.Combine(Path.GetDirectoryName(exePath) ?? ".", "update-and-restart.bat");
+                        var exeName = Path.GetFileName(exePath);
+                        var sb = new StringBuilder();
+                        sb.AppendLine("@echo off");
+                        sb.AppendLine("setlocal enableextensions");
+                        // Wait for current process to exit
+                        sb.AppendLine(":waitloop");
+                        sb.AppendLine($"tasklist /FI \"IMAGENAME eq {exeName}\" | find /I \"{exeName}\" >nul");
+                        sb.AppendLine("if %ERRORLEVEL%==0 (");
+                        sb.AppendLine("  timeout /t 1 /nobreak >nul");
+                        sb.AppendLine("  goto waitloop");
+                        sb.AppendLine(")");
+                        // Replace and restart
+                        sb.AppendLine($"move /y \"{tempExePath}\" \"{exePath}\"");
+                        sb.AppendLine($"start \"\" \"{exePath}\"");
+                        sb.AppendLine("endlocal");
+                        // Delete self
+                        sb.AppendLine("(goto) 2>nul & del \"%~f0\"");
+
+                        File.WriteAllText(batPath, sb.ToString(), Encoding.ASCII);
+                        DebugLogger.LogConfiguration("Updater BAT Path", batPath, "MainWindow");
+
+                        // Start the updater
+                        var psi = new ProcessStartInfo
+                        {
+                            FileName = "cmd.exe",
+                            Arguments = "/C \"" + batPath + "\"",
+                            UseShellExecute = false,
+                            CreateNoWindow = true,
+                            WindowStyle = ProcessWindowStyle.Hidden
+                        };
+                        Process.Start(psi);
+
+                        // Inform the user and close the app so updater can replace and restart
+                        var newVerText = latestVersion != null ? latestVersion.ToString() : latestTag;
+                        DebugLogger.LogInfo($"Application updated to version {newVerText}. It will restart now.", "MainWindow");
+                        ChangeRowIconAndStatus(ID.ApplicationUpdate, "GreenCheckboxIcon", "Installer updated - restarting...");
+                        MessageBox.Show(
+                            $"A new version ({newVerText}) of this installer has been downloaded.\n\nThe application will now restart to complete the update.",
+                            "Update Available",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Information);
+
+                        DebugLogger.Flush();
+                        Application.Current.Shutdown();
+                        DebugLogger.LogMethodEnd("CheckAndUpdateSelfAsync", "true (update triggered)", "MainWindow");
+                        return true; // Update triggered; caller should stop further work
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                ChangeRowIconAndStatus(ID.ApplicationUpdate, "YellowExclamationIcon", "Could not check for installer updates");
+                DebugLogger.LogException(ex, "Self-update failed (continuing without update)", "MainWindow");
+            }
+
+            DebugLogger.LogMethodEnd("CheckAndUpdateSelfAsync", "false (no update)", "MainWindow");
+            return false;
         }
     }
 }
