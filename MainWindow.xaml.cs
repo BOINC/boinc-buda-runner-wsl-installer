@@ -37,6 +37,10 @@ namespace boinc_buda_runner_wsl_installer
         public MainWindow()
         {
             InitializeComponent();
+
+            // Enable debug logging by default
+            DebugLogger.IsEnabled = true;
+
             TableItems = new ObservableCollection<TableRow>
             {
                 new TableRow { Id = ID.ApplicationUpdate, Icon = "", Status = "Check installer update" },
@@ -50,19 +54,6 @@ namespace boinc_buda_runner_wsl_installer
 
             DebugLogger.LogInfo("MainWindow initialized", "MainWindow");
             DebugLogger.LogConfiguration("Initial table items count", TableItems.Count, "MainWindow");
-        }
-
-        // Debug checkbox event handlers
-        private void DebugLogCheckBox_Checked(object sender, RoutedEventArgs e)
-        {
-            DebugLogger.IsEnabled = true;
-            DebugLogger.LogInfo("Debug logging enabled by user", "MainWindow");
-        }
-
-        private void DebugLogCheckBox_Unchecked(object sender, RoutedEventArgs e)
-        {
-            DebugLogger.LogInfo("Debug logging being disabled by user", "MainWindow");
-            DebugLogger.IsEnabled = false;
         }
 
         private bool CheckWindowsVersionCompatibility()
@@ -191,6 +182,7 @@ namespace boinc_buda_runner_wsl_installer
                         DebugLogger.LogError($"WSL check failed with status: {wslResult.Status}", "MainWindow");
                         ChangeRowIconAndStatus(ID.WslCheck, "RedCancelIcon", WslCheck.GetStatusDisplayMessage(wslResult));
                         DebugLogger.LogMethodEnd("CheckWsl", "false (WSL error)", "MainWindow");
+                        PromptOpenIssue("WSL check error", WslCheck.GetStatusDisplayMessage(wslResult));
                         return false;
                 }
             }
@@ -199,6 +191,7 @@ namespace boinc_buda_runner_wsl_installer
                 DebugLogger.LogException(ex, "Error occurred while checking WSL", "MainWindow");
                 ChangeRowIconAndStatus(ID.WslCheck, "RedCancelIcon", "Error occurred while checking WSL");
                 DebugLogger.LogMethodEnd("CheckWsl", "false (exception)", "MainWindow");
+                PromptOpenIssue("WSL check exception", ex.ToString());
                 return false;
             }
         }
@@ -225,8 +218,8 @@ namespace boinc_buda_runner_wsl_installer
                         DebugLogger.LogWarning($"BOINC process is running: {boincResult.Message}", "MainWindow");
                         ChangeRowIconAndStatus(ID.BoincProcessCheck, "RedCancelIcon", boincResult.Message);
 
-                        // Ask user if they want to stop BOINC
-                        var result = MessageBox.Show(
+                        // Show instruction to stop BOINC (do NOT offer to create an issue here)
+                        MessageBox.Show(
                             $"BOINC client is currently running and may interfere with the installation.\n\nPlease stop the running BOINC client and retry the installation.",
                             $"{boincResult.Message}",
                             MessageBoxButton.OK,
@@ -245,6 +238,8 @@ namespace boinc_buda_runner_wsl_installer
                         DebugLogger.LogWarning($"Unable to check BOINC status: {boincResult.ErrorMessage}", "MainWindow");
                         ChangeRowIconAndStatus(ID.BoincProcessCheck, "YellowExclamationIcon", $"Unable to check BOINC status: {boincResult.ErrorMessage}");
                         DebugLogger.LogMethodEnd("CheckBoincProcess", "true (error, continue anyway)", "MainWindow");
+                        // Continue but offer to report if user wants
+                        PromptOpenIssue("BOINC process check error", boincResult.ErrorMessage);
                         return true; // Continue despite error
                 }
             }
@@ -253,6 +248,8 @@ namespace boinc_buda_runner_wsl_installer
                 DebugLogger.LogException(ex, "Error occurred while checking BOINC process", "MainWindow");
                 ChangeRowIconAndStatus(ID.BoincProcessCheck, "YellowExclamationIcon", "Error occurred while checking BOINC process");
                 DebugLogger.LogMethodEnd("CheckBoincProcess", "true (exception, continue anyway)", "MainWindow");
+                // Offer to report issue
+                PromptOpenIssue("BOINC process check exception", ex.ToString());
                 return true; // Continue despite error
             }
         }
@@ -305,6 +302,8 @@ namespace boinc_buda_runner_wsl_installer
                         DebugLogger.LogError($"BUDA Runner check failed: {budaResult.ErrorMessage}", "MainWindow");
                         ChangeRowIconAndStatus(ID.BudaRunnerCheck, "YellowExclamationIcon", BudaRunnerCheck.GetStatusDisplayMessage(budaResult));
                         DebugLogger.LogMethodEnd("CheckBudaRunner", "true (error, continue anyway)", "MainWindow");
+                        // Offer to report issue
+                        PromptOpenIssue("BUDA Runner check error", budaResult.ErrorMessage);
                         return true; // Continue despite error
                 }
             }
@@ -313,6 +312,8 @@ namespace boinc_buda_runner_wsl_installer
                 DebugLogger.LogException(ex, "Error occurred while checking BUDA Runner", "MainWindow");
                 ChangeRowIconAndStatus(ID.BudaRunnerCheck, "YellowExclamationIcon", "Error occurred while checking BUDA Runner");
                 DebugLogger.LogMethodEnd("CheckBudaRunner", "true (exception, continue anyway)", "MainWindow");
+                // Offer to report issue
+                PromptOpenIssue("BUDA Runner check exception", ex.ToString());
                 return true; // Continue despite error
             }
         }
@@ -345,6 +346,8 @@ namespace boinc_buda_runner_wsl_installer
                     DebugLogger.LogError("BUDA Runner installation failed", "MainWindow");
                     ChangeRowIconAndStatus(ID.BudaRunnerCheck, "RedCancelIcon", "Failed to install BUDA Runner");
                     DebugLogger.LogMethodEnd("InstallBudaRunner", "false", "MainWindow");
+                    // Offer to report issue
+                    PromptOpenIssue("BUDA Runner installation failed", "Failed to install BUDA Runner");
                     return false;
                 }
             }
@@ -353,6 +356,8 @@ namespace boinc_buda_runner_wsl_installer
                 DebugLogger.LogException(ex, "BUDA Runner installation failed", "MainWindow");
                 ChangeRowIconAndStatus(ID.BudaRunnerCheck, "RedCancelIcon", $"BUDA Runner installation failed: {ex.Message}");
                 DebugLogger.LogMethodEnd("InstallBudaRunner", "false (exception)", "MainWindow");
+                // Offer to report issue
+                PromptOpenIssue("BUDA Runner installation exception", ex.ToString());
                 return false;
             }
         }
@@ -397,6 +402,8 @@ namespace boinc_buda_runner_wsl_installer
                     DebugLogger.LogError("WSL installation failed", "MainWindow");
                     ChangeRowIconAndStatus(ID.WslCheck, "RedCancelIcon", "Failed to install WSL");
                     DebugLogger.LogMethodEnd("InstallWsl", "false", "MainWindow");
+                    // Offer to report issue
+                    PromptOpenIssue("WSL installation failed", "Failed to install WSL");
                     return false;
                 }
             }
@@ -405,6 +412,8 @@ namespace boinc_buda_runner_wsl_installer
                 DebugLogger.LogException(ex, "WSL installation failed", "MainWindow");
                 ChangeRowIconAndStatus(ID.WslCheck, "RedCancelIcon", "WSL installation failed");
                 DebugLogger.LogMethodEnd("InstallWsl", "false (exception)", "MainWindow");
+                // Offer to report issue
+                PromptOpenIssue("WSL installation exception", ex.ToString());
                 return false;
             }
         }
@@ -437,6 +446,8 @@ namespace boinc_buda_runner_wsl_installer
                     DebugLogger.LogWarning("Some WSL issues could not be fixed automatically", "MainWindow");
                     ChangeRowIconAndStatus(ID.WslCheck, "YellowExclamationIcon", "Some WSL issues could not be fixed automatically");
                     DebugLogger.LogMethodEnd("FixWslIssues", "false", "MainWindow");
+                    // Offer to report issue
+                    PromptOpenIssue("WSL fix issues could not be resolved", WslCheck.GetStatusDisplayMessage(wslResult));
                     return false;
                 }
             }
@@ -445,6 +456,8 @@ namespace boinc_buda_runner_wsl_installer
                 DebugLogger.LogException(ex, "Failed to fix WSL configuration", "MainWindow");
                 ChangeRowIconAndStatus(ID.WslCheck, "RedCancelIcon", "Failed to fix WSL configuration");
                 DebugLogger.LogMethodEnd("FixWslIssues", "false (exception)", "MainWindow");
+                // Offer to report issue
+                PromptOpenIssue("WSL fix exception", ex.ToString());
                 return false;
             }
         }
@@ -616,6 +629,47 @@ namespace boinc_buda_runner_wsl_installer
             else
             {
                 DebugLogger.LogWarning($"Could not find table row with ID: {id}", "MainWindow");
+            }
+        }
+
+        private void PromptOpenIssue(string title, string details)
+        {
+            try
+            {
+                // Build a GitHub new issue URL with prefilled title/body.
+                var repoNewIssueUrl = "https://github.com/BOINC/boinc-buda-runner-wsl-installer/issues/new";
+
+                var sb = new StringBuilder();
+                sb.AppendLine("Describe the problem and steps to reproduce here.\n");
+                sb.AppendLine("Error context:");
+                sb.AppendLine(details ?? "(no details)");
+                sb.AppendLine();
+                sb.AppendLine($"App version: {FileVersionInfo.GetVersionInfo(Process.GetCurrentProcess().MainModule.FileName).FileVersion}");
+                sb.AppendLine($"OS: {Environment.OSVersion}");
+                sb.AppendLine($"64-bit OS: {Environment.Is64BitOperatingSystem}, 64-bit Process: {Environment.Is64BitProcess}");
+                sb.AppendLine();
+                if (!string.IsNullOrEmpty(DebugLogger.LogFilePath))
+                {
+                    sb.AppendLine($"Log file path (attach this file in the issue): {DebugLogger.LogFilePath}");
+                }
+
+                var url = repoNewIssueUrl + "?title=" + Uri.EscapeDataString(title ?? "Installer error")
+                          + "&body=" + Uri.EscapeDataString(sb.ToString());
+
+                var ask = MessageBox.Show(
+                    "An error occurred. Would you like to report it on GitHub? Your debug log file path will be included in the report so you can attach it.",
+                    "Report Error",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Question);
+
+                if (ask == MessageBoxResult.Yes)
+                {
+                    Process.Start(url);
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.LogException(ex, "Failed to create/open GitHub issue link", "MainWindow");
             }
         }
 

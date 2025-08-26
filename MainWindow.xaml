@@ -75,22 +75,12 @@ along with BOINC.  If not, see <http://www.gnu.org/licenses/>.
             </ItemsControl.ItemTemplate>
         </ItemsControl>
 
-        <!-- Bottom panel with debug checkbox on left and buttons on right -->
+        <!-- Bottom panel with buttons on right -->
         <Grid Grid.Row="1" Margin="10">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
-
-            <!-- Debug checkbox on the left -->
-            <CheckBox Name="DebugLogCheckBox"
-                      Grid.Column="0"
-                      Content="Write debug log to a file"
-                      HorizontalAlignment="Left"
-                      VerticalAlignment="Center"
-                      IsChecked="False"
-                      Checked="DebugLogCheckBox_Checked"
-                      Unchecked="DebugLogCheckBox_Unchecked"/>
 
             <!-- Buttons on the right -->
             <StackPanel Grid.Column="1" Orientation="Horizontal">
