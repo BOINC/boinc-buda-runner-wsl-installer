@@ -27,8 +27,9 @@ namespace boinc_buda_runner_wsl_installer
     internal static class DebugLogger
     {
         private static string _logFilePath;
-        private static bool _isEnabled = false;
+        private static bool _isEnabled = true; // Always enabled
         private static readonly object _lockObject = new object();
+        private static bool _initialized = false;
 
         /// <summary>
         /// Gets or sets whether debug logging is enabled
@@ -43,10 +44,6 @@ namespace boinc_buda_runner_wsl_installer
                 {
                     InitializeLogFile();
                 }
-                else if (!_isEnabled && !string.IsNullOrEmpty(_logFilePath))
-                {
-                    LogInfo("Debug logging disabled by user", "DebugLogger");
-                }
             }
         }
 
@@ -56,16 +53,19 @@ namespace boinc_buda_runner_wsl_installer
         public static string LogFilePath => _logFilePath;
 
         /// <summary>
-        /// Initializes the log file with a timestamped filename
+        /// Initializes the log file with a timestamped filename in the temp directory
         /// </summary>
         private static void InitializeLogFile()
         {
+            if (_initialized) return;
+            _initialized = true;
+
             try
             {
                 var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
                 var fileName = $"boinc_buda_installer_debug_{timestamp}.log";
-                var documentsPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-                _logFilePath = Path.Combine(documentsPath, fileName);
+                var tempPath = Path.GetTempPath();
+                _logFilePath = Path.Combine(tempPath, fileName);
 
                 // Create the initial log entry
                 LogInfo($"Debug logging started at {DateTime.Now:yyyy-MM-dd HH:mm:ss}", "DebugLogger");
@@ -80,15 +80,10 @@ namespace boinc_buda_runner_wsl_installer
                 LogInfo($"User Name: {Environment.UserName}", "DebugLogger");
                 LogInfo("=" + new string('=', 70), "DebugLogger");
             }
-            catch (Exception ex)
+            catch
             {
-                // If we can't create the log file, disable logging
+                // If we can't create the log file, disable logging silently
                 _isEnabled = false;
-                System.Windows.MessageBox.Show(
-                    $"Failed to create debug log file: {ex.Message}\n\nDebug logging has been disabled.",
-                    "Debug Logging Error",
-                    System.Windows.MessageBoxButton.OK,
-                    System.Windows.MessageBoxImage.Warning);
             }
         }
 
@@ -191,8 +186,14 @@ namespace boinc_buda_runner_wsl_installer
         /// </summary>
         private static void Log(string level, string message, string component)
         {
-            if (!_isEnabled || string.IsNullOrEmpty(_logFilePath))
+            if (!_isEnabled)
                 return;
+
+            if (string.IsNullOrEmpty(_logFilePath))
+            {
+                InitializeLogFile();
+                if (string.IsNullOrEmpty(_logFilePath)) return;
+            }
 
             try
             {
