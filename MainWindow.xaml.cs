@@ -785,7 +785,7 @@ namespace boinc_buda_runner_wsl_installer
 
                         // Update available: inform user but do not perform self-update
                         var newVerText = latestVersion != null ? latestVersion.ToString() : latestTag ?? "latest";
-                        var statusText = $"New installer version available: {newVerText}. Please download the latest installer from the Releases page.";
+                        var statusText = $"New installer version available: {newVerText}. Please download the latest installer from the Releases page: https://github.com/BOINC/boinc-buda-runner-wsl-installer/releases";
                         ChangeRowIconAndStatus(ID.ApplicationUpdate, "YellowExclamationIcon", statusText);
                         DebugLogger.LogInfo($"Update available ({newVerText}), self-update is disabled; informing user only.", "MainWindow");
                         DebugLogger.LogMethodEnd("CheckApplicationUpdateAsync", "false (update available, no self-update)", "MainWindow");
