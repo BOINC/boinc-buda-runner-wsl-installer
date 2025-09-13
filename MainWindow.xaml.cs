@@ -802,5 +802,36 @@ namespace boinc_buda_runner_wsl_installer
             DebugLogger.LogMethodEnd("CheckApplicationUpdateAsync", "false (no update)", "MainWindow");
             return false;
         }
+
+        private void OpenLogButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var logPath = DebugLogger.LogFilePath;
+                if (string.IsNullOrEmpty(logPath))
+                {
+                    MessageBox.Show("Log file is not available yet.", "Open Log", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+
+                if (!System.IO.File.Exists(logPath))
+                {
+                    MessageBox.Show("Log file does not exist.", "Open Log", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                var psi = new ProcessStartInfo
+                {
+                    FileName = logPath,
+                    UseShellExecute = true
+                };
+                Process.Start(psi);
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.LogException(ex, "Failed to open log file", "MainWindow");
+                MessageBox.Show("Failed to open the log file.", "Open Log", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
     }
 }

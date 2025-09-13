@@ -75,14 +75,19 @@ along with BOINC.  If not, see <http://www.gnu.org/licenses/>.
             </ItemsControl.ItemTemplate>
         </ItemsControl>
 
-        <!-- Bottom panel with buttons on right -->
+        <!-- Bottom panel with buttons -->
         <Grid Grid.Row="1" Margin="10">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
 
-            <!-- Buttons on the right -->
+            <!-- Open Log on the left -->
+            <StackPanel Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
+                <Button Name="OpenLogButton" Content="Open Log" Width="90" Height="30" Margin="5" Click="OpenLogButton_Click"/>
+            </StackPanel>
+
+            <!-- Install/Exit on the right -->
             <StackPanel Grid.Column="1" Orientation="Horizontal">
                 <Button Name="InstallButton" Content="Install" Width="80" Height="30" Margin="5" Click="InstallButton_Click"/>
                 <Button Name="ExitButton" Content="Exit" Width="80" Height="30" Margin="5" Click="ExitButton_Click"/>
