@@ -76,8 +76,8 @@ namespace boinc_buda_runner_wsl_installer
             }
 
             DebugLogger.LogInfo("User confirmed exit, shutting down application", "MainWindow");
-            DebugLogger.Flush();
             DebugLogger.LogMethodEnd("OnClosing", component: "MainWindow");
+            DebugLogger.Flush();
             base.OnClosing(e);
         }
 
