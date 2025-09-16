@@ -26,6 +26,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.ComponentModel; // for CancelEventArgs
 
 namespace boinc_buda_runner_wsl_installer
 {
@@ -53,6 +54,31 @@ namespace boinc_buda_runner_wsl_installer
 
             DebugLogger.LogInfo("MainWindow initialized", "MainWindow");
             DebugLogger.LogConfiguration("Initial table items count", TableItems.Count, "MainWindow");
+        }
+
+        protected override void OnClosing(CancelEventArgs e)
+        {
+            DebugLogger.LogMethodStart("OnClosing", component: "MainWindow");
+
+            var result = MessageBox.Show(
+                "Are you sure you want to exit the installer?",
+                "Confirm Exit",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            DebugLogger.LogInfo($"Exit confirmation dialog result: {result}", "MainWindow");
+
+            if (result != MessageBoxResult.Yes)
+            {
+                e.Cancel = true;
+                DebugLogger.LogMethodEnd("OnClosing", "cancelled by user", "MainWindow");
+                return;
+            }
+
+            DebugLogger.LogInfo("User confirmed exit, shutting down application", "MainWindow");
+            DebugLogger.LogMethodEnd("OnClosing", component: "MainWindow");
+            DebugLogger.Flush();
+            base.OnClosing(e);
         }
 
         private bool CheckWindowsVersionCompatibility()
@@ -593,25 +619,8 @@ namespace boinc_buda_runner_wsl_installer
         {
             DebugLogger.LogMethodStart("ExitButton_Click", component: "MainWindow");
 
-            // Show confirmation dialog before exiting
-            var result = MessageBox.Show(
-                "Are you sure you want to exit the installer?",
-                "Confirm Exit",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Question);
-
-            DebugLogger.LogInfo($"Exit confirmation dialog result: {result}", "MainWindow");
-
-            if (result == MessageBoxResult.Yes)
-            {
-                DebugLogger.LogInfo("User confirmed exit, shutting down application", "MainWindow");
-                DebugLogger.Flush();
-                Application.Current.Shutdown();
-            }
-            else
-            {
-                DebugLogger.LogInfo("User cancelled exit", "MainWindow");
-            }
+            // Delegate to window close to reuse confirmation logic
+            this.Close();
 
             DebugLogger.LogMethodEnd("ExitButton_Click", component: "MainWindow");
         }
