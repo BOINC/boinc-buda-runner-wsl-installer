@@ -510,6 +510,9 @@ namespace boinc_buda_runner_wsl_installer
             const string fallbackUrl = "https://github.com/BOINC/boinc-buda-runner-wsl/releases/latest";
             try
             {
+                var architecture = GetSystemArchitecture();
+                DebugLogger.LogConfiguration("Detected Architecture", architecture, COMPONENT);
+
                 using (var httpClient = new HttpClient())
                 {
                     httpClient.DefaultRequestHeaders.Add("User-Agent", "BOINC-BUDA-WSL-Installer");
@@ -517,16 +520,43 @@ namespace boinc_buda_runner_wsl_installer
                     DebugLogger.LogInfo($"Fetching download URL from GitHub: {GITHUB_RELEASES_URL}", COMPONENT);
                     var response = await httpClient.GetStringAsync(GITHUB_RELEASES_URL);
 
-                    // Find .wsl download URL
-                    var downloadMatches = Regex.Matches(response, @"""browser_download_url"":\s*""([^""]+\.wsl)""");
+                    // Find .wsl download URLs
+                    var downloadMatches = Regex.Matches(response, @"""browser_download_url""\s*:\s*""([^""]+\.wsl)""");
                     DebugLogger.LogConfiguration("Download Matches Found", downloadMatches.Count, COMPONENT);
 
                     if (downloadMatches.Count > 0)
                     {
-                        var downloadUrl = downloadMatches[0].Groups[1].Value;
-                        DebugLogger.LogConfiguration("GitHub Download URL", downloadUrl, COMPONENT);
-                        DebugLogger.LogMethodEnd("GetLatestDownloadUrlFromGitHubAsync", downloadUrl, COMPONENT);
-                        return downloadUrl;
+                        string preferredUrl = null;
+                        string firstUrl = downloadMatches[0].Groups[1].Value;
+
+                        foreach (Match m in downloadMatches)
+                        {
+                            var url = m.Groups[1].Value;
+                            var filename = Path.GetFileName(url).ToLowerInvariant();
+                            DebugLogger.LogDebug($"Evaluating asset: {filename}", COMPONENT);
+
+                            if (architecture.Equals("ARM64", StringComparison.OrdinalIgnoreCase))
+                            {
+                                if (filename.Contains("aarch64") || filename.Contains("arm64"))
+                                {
+                                    preferredUrl = url;
+                                    break; // exact arch match
+                                }
+                            }
+                            else // treat everything else as x64 preference
+                            {
+                                if (filename.Contains("x86_64") || filename.Contains("amd64") || filename.Contains("x64"))
+                                {
+                                    preferredUrl = url;
+                                    break; // exact arch match
+                                }
+                            }
+                        }
+
+                        var resultUrl = preferredUrl ?? firstUrl;
+                        DebugLogger.LogConfiguration("Selected Download URL", resultUrl, COMPONENT);
+                        DebugLogger.LogMethodEnd("GetLatestDownloadUrlFromGitHubAsync", resultUrl, COMPONENT);
+                        return resultUrl;
                     }
                     else
                     {
@@ -934,6 +964,38 @@ namespace boinc_buda_runner_wsl_installer
 
             DebugLogger.LogMethodEnd("GetStatusDisplayMessage", message, COMPONENT);
             return message;
+        }
+
+        private static string GetSystemArchitecture()
+        {
+            DebugLogger.LogMethodStart("GetSystemArchitecture", component: COMPONENT);
+            try
+            {
+                DebugLogger.LogConfiguration("Environment.Is64BitOperatingSystem", Environment.Is64BitOperatingSystem, COMPONENT);
+                var procArch = Environment.GetEnvironmentVariable("PROCESSOR_ARCHITECTURE") ?? string.Empty;
+                DebugLogger.LogConfiguration("PROCESSOR_ARCHITECTURE", procArch, COMPONENT);
+
+                if (procArch.Equals("ARM64", StringComparison.OrdinalIgnoreCase))
+                {
+                    DebugLogger.LogMethodEnd("GetSystemArchitecture", "ARM64", COMPONENT);
+                    return "ARM64";
+                }
+
+                if (Environment.Is64BitOperatingSystem)
+                {
+                    DebugLogger.LogMethodEnd("GetSystemArchitecture", "x64", COMPONENT);
+                    return "x64";
+                }
+
+                DebugLogger.LogMethodEnd("GetSystemArchitecture", "x86", COMPONENT);
+                return "x86";
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.LogException(ex, "Error detecting system architecture, defaulting to x64", COMPONENT);
+                DebugLogger.LogMethodEnd("GetSystemArchitecture", "x64 (default)", COMPONENT);
+                return "x64";
+            }
         }
     }
 }
