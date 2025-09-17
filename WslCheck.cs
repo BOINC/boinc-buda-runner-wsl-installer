@@ -18,10 +18,11 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Net.Http;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-using System.Linq;
 
 namespace boinc_buda_runner_wsl_installer
 {
@@ -42,17 +43,10 @@ namespace boinc_buda_runner_wsl_installer
         public class WslVersionInfo
         {
             public string WslVersion { get; set; }
-            public string KernelVersion { get; set; }
-            public string WslgVersion { get; set; }
-            public string MsrdcVersion { get; set; }
-            public string Direct3DVersion { get; set; }
-            public string DxCoreVersion { get; set; }
-            public string WindowsVersion { get; set; }
         }
 
         public class WslStatusInfo
         {
-            public string DefaultDistribution { get; set; }
             public int DefaultVersion { get; set; }
         }
 
@@ -91,15 +85,12 @@ namespace boinc_buda_runner_wsl_installer
                 }
 
                 DebugLogger.LogConfiguration("WSL Version", result.VersionInfo.WslVersion ?? "Unknown", COMPONENT);
-                DebugLogger.LogConfiguration("Kernel Version", result.VersionInfo.KernelVersion ?? "Unknown", COMPONENT);
-                DebugLogger.LogConfiguration("WSLg Version", result.VersionInfo.WslgVersion ?? "Unknown", COMPONENT);
 
                 // Step 2: Check WSL status (default distribution and version)
                 DebugLogger.LogInfo("Step 2: Checking WSL status (default distribution and version)", COMPONENT);
                 result.StatusInfo = await GetWslStatusAsync();
                 if (result.StatusInfo != null)
                 {
-                    DebugLogger.LogConfiguration("Default Distribution", result.StatusInfo.DefaultDistribution ?? "Unknown", COMPONENT);
                     DebugLogger.LogConfiguration("Default Version", result.StatusInfo.DefaultVersion, COMPONENT);
                 }
                 else
@@ -172,7 +163,9 @@ namespace boinc_buda_runner_wsl_installer
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
                     CreateNoWindow = true,
-                    WindowStyle = ProcessWindowStyle.Hidden
+                    WindowStyle = ProcessWindowStyle.Hidden,
+                    StandardOutputEncoding = Encoding.Unicode,
+                    StandardErrorEncoding = Encoding.Unicode
                 };
 
                 using (var process = new Process { StartInfo = startInfo })
@@ -226,7 +219,9 @@ namespace boinc_buda_runner_wsl_installer
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
                     CreateNoWindow = true,
-                    WindowStyle = ProcessWindowStyle.Hidden
+                    WindowStyle = ProcessWindowStyle.Hidden,
+                    StandardOutputEncoding = Encoding.Unicode,
+                    StandardErrorEncoding = Encoding.Unicode
                 };
 
                 using (var process = new Process { StartInfo = startInfo })
@@ -651,7 +646,9 @@ namespace boinc_buda_runner_wsl_installer
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
                     CreateNoWindow = true,
-                    WindowStyle = ProcessWindowStyle.Hidden
+                    WindowStyle = ProcessWindowStyle.Hidden,
+                    StandardOutputEncoding = Encoding.Unicode,
+                    StandardErrorEncoding = Encoding.Unicode
                 };
 
                 using (var process = new Process { StartInfo = startInfo })
@@ -752,20 +749,11 @@ namespace boinc_buda_runner_wsl_installer
             {
                 DebugLogger.LogDebug($"Parsing line: {line}", COMPONENT);
 
-                if (line.StartsWith("WSL version:"))
+                if (line.Contains("WSL") && !line.Contains("WSLg"))
+                {
                     versionInfo.WslVersion = ExtractVersionValue(line);
-                else if (line.StartsWith("Kernel version:"))
-                    versionInfo.KernelVersion = ExtractVersionValue(line);
-                else if (line.StartsWith("WSLg version:"))
-                    versionInfo.WslgVersion = ExtractVersionValue(line);
-                else if (line.StartsWith("MSRDC version:"))
-                    versionInfo.MsrdcVersion = ExtractVersionValue(line);
-                else if (line.StartsWith("Direct3D version:"))
-                    versionInfo.Direct3DVersion = ExtractVersionValue(line);
-                else if (line.StartsWith("DXCore version:"))
-                    versionInfo.DxCoreVersion = ExtractVersionValue(line);
-                else if (line.StartsWith("Windows version:"))
-                    versionInfo.WindowsVersion = ExtractVersionValue(line);
+                    break;
+                }
             }
 
             DebugLogger.LogConfiguration("Parsed WSL Version", versionInfo.WslVersion ?? "null", COMPONENT);
@@ -788,17 +776,12 @@ namespace boinc_buda_runner_wsl_installer
             {
                 DebugLogger.LogDebug($"Parsing status line: {line}", COMPONENT);
 
-                if (line.StartsWith("Default Distribution:"))
-                    statusInfo.DefaultDistribution = ExtractVersionValue(line);
-                else if (line.StartsWith("Default Version:"))
-                {
-                    var versionStr = ExtractVersionValue(line);
-                    if (int.TryParse(versionStr, out var version))
+                var versionStr = ExtractVersionValue(line);
+                if (int.TryParse(versionStr, out var version))
+                    if (version == 1 || version == 2)
                         statusInfo.DefaultVersion = version;
-                }
             }
 
-            DebugLogger.LogConfiguration("Parsed Default Distribution", statusInfo.DefaultDistribution ?? "null", COMPONENT);
             DebugLogger.LogConfiguration("Parsed Default Version", statusInfo.DefaultVersion, COMPONENT);
             DebugLogger.LogMethodEnd("ParseWslStatusOutput", $"DefaultVersion: {statusInfo.DefaultVersion}", COMPONENT);
             return statusInfo;
@@ -826,8 +809,8 @@ namespace boinc_buda_runner_wsl_installer
 
             if (string.IsNullOrEmpty(currentVersion) || string.IsNullOrEmpty(latestVersion) || latestVersion == "Unknown")
             {
-                DebugLogger.LogMethodEnd("IsUpdateRequired", "false (invalid versions)", COMPONENT);
-                return false;
+                DebugLogger.LogMethodEnd("IsUpdateRequired", "true (invalid versions)", COMPONENT);
+                return true;
             }
 
             try
@@ -845,9 +828,9 @@ namespace boinc_buda_runner_wsl_installer
             }
             catch (Exception ex)
             {
-                DebugLogger.LogException(ex, "Error comparing versions, assuming no update needed", COMPONENT);
-                DebugLogger.LogMethodEnd("IsUpdateRequired", "false (exception)", COMPONENT);
-                return false;
+                DebugLogger.LogException(ex, "Error comparing versions, forcing the update", COMPONENT);
+                DebugLogger.LogMethodEnd("IsUpdateRequired", "true (exception)", COMPONENT);
+                return true;
             }
         }
 
