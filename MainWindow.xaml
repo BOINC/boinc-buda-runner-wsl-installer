@@ -23,7 +23,7 @@ along with BOINC.  If not, see <http://www.gnu.org/licenses/>.
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:boinc_buda_runner_wsl_installer"
         mc:Ignorable="d"
-        Title="BOINC BUDA Runner WSL Installer - Version 1.0.0"
+        Title="BOINC BUDA Runner WSL Installer - Version 2.0.0"
         Height="450"
         Width="800">
     <Grid>

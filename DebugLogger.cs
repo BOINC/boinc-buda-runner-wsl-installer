@@ -71,6 +71,7 @@ namespace boinc_buda_runner_wsl_installer
                 LogInfo($"Debug logging started at {DateTime.Now:yyyy-MM-dd HH:mm:ss}", "DebugLogger");
                 LogInfo($"Log file: {_logFilePath}", "DebugLogger");
                 LogInfo($"Application: BOINC BUDA Runner WSL Installer", "DebugLogger");
+                LogInfo($"Application Verion: 2.0.0", "DebugLogger");
                 LogInfo($"Windows Version: {Environment.OSVersion}", "DebugLogger");
                 LogInfo($"Is 64-bit OS: {Environment.Is64BitOperatingSystem}", "DebugLogger");
                 LogInfo($"Is 64-bit Process: {Environment.Is64BitProcess}", "DebugLogger");
