@@ -612,12 +612,14 @@ namespace boinc_buda_runner_wsl_installer
                 var startInfo = new ProcessStartInfo
                 {
                     FileName = "wsl.exe",
-                    Arguments = $"--install --from-file \"{archivePath}\"",
+                    Arguments = $"--install --from-file \"{archivePath}\" --no-launch",
                     UseShellExecute = false,
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
                     CreateNoWindow = true,
-                    WindowStyle = ProcessWindowStyle.Hidden
+                    WindowStyle = ProcessWindowStyle.Hidden,
+                    StandardOutputEncoding = Encoding.Unicode,
+                    StandardErrorEncoding = Encoding.Unicode
                 };
 
                 DebugLogger.LogInfo($"Starting WSL installation process: wsl.exe {startInfo.Arguments}", COMPONENT);
@@ -625,123 +627,15 @@ namespace boinc_buda_runner_wsl_installer
                 using (var process = new Process { StartInfo = startInfo })
                 {
                     process.Start();
+                    var output = await process.StandardOutput.ReadToEndAsync();
+                    var error = await process.StandardError.ReadToEndAsync();
+                    await Task.Run(() => process.WaitForExit(60000)); // 1 minute timeout
 
-                    // Read output line by line asynchronously and wait for "Podman setup complete"
-                    bool setupComplete = false;
-                    var outputTask = Task.Run(async () =>
-                    {
-                        try
-                        {
-                            using (var reader = process.StandardOutput)
-                            {
-                                string line;
-                                while ((line = await reader.ReadLineAsync()) != null)
-                                {
-                                    DebugLogger.LogDebug($"WSL Install Output: {line}", COMPONENT);
-                                    // Check if the line contains "Podman setup complete"
-                                    if (line.Contains("Podman setup complete"))
-                                    {
-                                        DebugLogger.LogInfo("Detected 'Podman setup complete' message", COMPONENT);
-                                        setupComplete = true;
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            DebugLogger.LogException(ex, "Error reading WSL install output", COMPONENT);
-                        }
-                    });
+                    DebugLogger.LogProcessExecution("wsl.exe", startInfo.Arguments, process.ExitCode, output, error, COMPONENT);
 
-                    // Read error output in parallel
-                    var errorTask = Task.Run(async () =>
-                    {
-                        try
-                        {
-                            using (var reader = process.StandardError)
-                            {
-                                string line;
-                                while ((line = await reader.ReadLineAsync()) != null)
-                                {
-                                    DebugLogger.LogWarning($"WSL Install Error: {line}", COMPONENT);
-                                }
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            DebugLogger.LogException(ex, "Error reading WSL install error output", COMPONENT);
-                        }
-                    });
-
-                    // Wait for either setup completion or timeout (5 minutes)
-                    var timeoutTask = Task.Delay(300000); // 5 minute timeout
-                    DebugLogger.LogInfo("Waiting for installation completion or 5-minute timeout", COMPONENT);
-                    var completedTask = await Task.WhenAny(outputTask, timeoutTask);
-
-                    if (completedTask == timeoutTask)
-                    {
-                        DebugLogger.LogError("WSL installation timed out after 5 minutes", COMPONENT);
-                        // Timeout occurred - kill the process
-                        try
-                        {
-                            if (!process.HasExited)
-                            {
-                                DebugLogger.LogInfo("Killing timed-out process", COMPONENT);
-                                process.Kill();
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            DebugLogger.LogException(ex, "Error killing timed-out process", COMPONENT);
-                        }
-                        DebugLogger.LogMethodEnd("InstallWslImageAsync", "false (timeout)", COMPONENT);
-                        return false;
-                    }
-
-                    // If we reach here, setup should be complete
-                    if (setupComplete)
-                    {
-                        DebugLogger.LogInfo("Setup completed successfully, terminating process", COMPONENT);
-                        // Kill the process since it won't end by itself after Podman setup complete
-                        try
-                        {
-                            if (!process.HasExited)
-                            {
-                                process.Kill();
-                                // Give the process a moment to terminate
-                                await Task.Delay(1000);
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            DebugLogger.LogException(ex, "Error killing completed process", COMPONENT);
-                        }
-                        DebugLogger.LogMethodEnd("InstallWslImageAsync", "true", COMPONENT);
-                        return true;
-                    }
-
-                    // Wait a bit more for the process to exit naturally, then kill if needed
-                    DebugLogger.LogInfo("Waiting additional 10 seconds for natural process termination", COMPONENT);
-                    await Task.Run(() => process.WaitForExit(10000)); // 10 second grace period
-
-                    if (!process.HasExited)
-                    {
-                        try
-                        {
-                            DebugLogger.LogInfo("Process did not exit naturally, killing it", COMPONENT);
-                            process.Kill();
-                        }
-                        catch (Exception ex)
-                        {
-                            DebugLogger.LogException(ex, "Error killing process during grace period", COMPONENT);
-                        }
-                    }
-
-                    // Installation is considered successful if we detected the completion message
-                    DebugLogger.LogConfiguration("Final Setup Complete Status", setupComplete, COMPONENT);
-                    DebugLogger.LogMethodEnd("InstallWslImageAsync", setupComplete.ToString(), COMPONENT);
-                    return setupComplete;
+                    var success = process.ExitCode == 0;
+                    DebugLogger.LogMethodEnd("InstallWslImageAsync", success.ToString(), COMPONENT);
+                    return success;
                 }
             }
             catch (Exception ex)
@@ -806,7 +700,7 @@ namespace boinc_buda_runner_wsl_installer
                 var startInfo = new ProcessStartInfo
                 {
                     FileName = "wsl.exe",
-                    Arguments = $"-d {imageName} /bin/bash -c \"echo 'BUDA Runner initial setup completed' && exit 0\"",
+                    Arguments = $"-d {imageName}",
                     UseShellExecute = false,
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
@@ -817,15 +711,123 @@ namespace boinc_buda_runner_wsl_installer
                 using (var process = new Process { StartInfo = startInfo })
                 {
                     process.Start();
-                    var output = await process.StandardOutput.ReadToEndAsync();
-                    var error = await process.StandardError.ReadToEndAsync();
-                    await Task.Run(() => process.WaitForExit(120000)); // 2 minute timeout
 
-                    DebugLogger.LogProcessExecution("wsl.exe", startInfo.Arguments, process.ExitCode, output, error, COMPONENT);
+                    // Read output line by line asynchronously and wait for "Podman setup complete"
+                    bool setupComplete = false;
+                    var outputTask = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            using (var reader = process.StandardOutput)
+                            {
+                                string line;
+                                while ((line = await reader.ReadLineAsync()) != null)
+                                {
+                                    DebugLogger.LogDebug($"WSL Initial Run Output: {line}", COMPONENT);
+                                    // Check if the line contains "Podman setup complete"
+                                    if (line.Contains("Podman setup complete"))
+                                    {
+                                        DebugLogger.LogInfo("Detected 'Podman setup complete' message", COMPONENT);
+                                        setupComplete = true;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            DebugLogger.LogException(ex, "Error reading WSL initial run output", COMPONENT);
+                        }
+                    });
 
-                    var success = process.ExitCode == 0;
-                    DebugLogger.LogMethodEnd("RunInitialSetupAsync", success.ToString(), COMPONENT);
-                    return success;
+                    // Read error output in parallel
+                    var errorTask = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            using (var reader = process.StandardError)
+                            {
+                                string line;
+                                while ((line = await reader.ReadLineAsync()) != null)
+                                {
+                                    DebugLogger.LogWarning($"WSL Initial Run Error: {line}", COMPONENT);
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            DebugLogger.LogException(ex, "Error reading WSL initial run error output", COMPONENT);
+                        }
+                    });
+
+                    // Wait for either setup completion or timeout (5 minutes)
+                    var timeoutTask = Task.Delay(300000); // 5 minute timeout
+                    DebugLogger.LogInfo("Waiting for initial run completion or 5-minute timeout", COMPONENT);
+                    var completedTask = await Task.WhenAny(outputTask, timeoutTask);
+
+                    if (completedTask == timeoutTask)
+                    {
+                        DebugLogger.LogError("WSL initial run timed out after 5 minutes", COMPONENT);
+                        // Timeout occurred - kill the process
+                        try
+                        {
+                            if (!process.HasExited)
+                            {
+                                DebugLogger.LogInfo("Killing timed-out process", COMPONENT);
+                                process.Kill();
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            DebugLogger.LogException(ex, "Error killing timed-out process", COMPONENT);
+                        }
+                        DebugLogger.LogMethodEnd("RunInitialSetupAsync", "false (timeout)", COMPONENT);
+                        return false;
+                    }
+
+                    // If we reach here, setup should be complete
+                    if (setupComplete)
+                    {
+                        DebugLogger.LogInfo("Setup completed successfully, terminating process", COMPONENT);
+                        // Kill the process since it won't end by itself after Podman setup complete
+                        try
+                        {
+                            if (!process.HasExited)
+                            {
+                                process.Kill();
+                                // Give the process a moment to terminate
+                                await Task.Delay(1000);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            DebugLogger.LogException(ex, "Error killing completed process", COMPONENT);
+                        }
+                        DebugLogger.LogMethodEnd("RunInitialSetupAsync", "true", COMPONENT);
+                        return true;
+                    }
+
+                    // Wait a bit more for the process to exit naturally, then kill if needed
+                    DebugLogger.LogInfo("Waiting additional 10 seconds for natural process termination", COMPONENT);
+                    await Task.Run(() => process.WaitForExit(10000)); // 10 second grace period
+
+                    if (!process.HasExited)
+                    {
+                        try
+                        {
+                            DebugLogger.LogInfo("Process did not exit naturally, killing it", COMPONENT);
+                            process.Kill();
+                        }
+                        catch (Exception ex)
+                        {
+                            DebugLogger.LogException(ex, "Error killing process during grace period", COMPONENT);
+                        }
+                    }
+
+                    // Installation is considered successful if we detected the completion message
+                    DebugLogger.LogConfiguration("Final Setup Complete Status", setupComplete, COMPONENT);
+                    DebugLogger.LogMethodEnd("RunInitialSetupAsync", setupComplete.ToString(), COMPONENT);
+                    return setupComplete;
                 }
             }
             catch (Exception ex)

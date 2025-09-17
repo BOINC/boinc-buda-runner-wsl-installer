@@ -223,7 +223,7 @@ namespace boinc_buda_runner_wsl_installer
                 var startInfo = new ProcessStartInfo
                 {
                     FileName = "dism.exe",
-                    Arguments = $"/online /get-featureinfo /featurename:{featureName}",
+                    Arguments = $"/English /online /get-featureinfo /featurename:{featureName}",
                     UseShellExecute = false,
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
@@ -355,7 +355,7 @@ namespace boinc_buda_runner_wsl_installer
                 var startInfo = new ProcessStartInfo
                 {
                     FileName = "dism.exe",
-                    Arguments = $"/online /enable-feature /featurename:{featureName} /all /norestart",
+                    Arguments = $"/English /online /enable-feature /featurename:{featureName} /all /norestart",
                     UseShellExecute = false,
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
