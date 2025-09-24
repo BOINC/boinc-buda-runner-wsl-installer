@@ -23,14 +23,29 @@ along with BOINC.  If not, see <http://www.gnu.org/licenses/>.
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:boinc_buda_runner_wsl_installer"
         mc:Ignorable="d"
-        Title="BOINC BUDA Runner WSL Installer - Version 2.0.0"
+        Title="BOINC WSL Distro Installer - Version 2.0.0"
         Height="450"
         Width="800">
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+    </Window.Resources>
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
+
+        <!-- Intro text shown before installation starts -->
+        <TextBlock x:Name="IntroTextBlock"
+                   Grid.Row="0"
+                   Text="This will install the BOINC WSL Distro, allowing BOINC to run jobs based on Docker.&#x0a;Click Install to continue."
+                   TextAlignment="Center"
+                   VerticalAlignment="Center"
+                   HorizontalAlignment="Center"
+                   FontSize="16"
+                   Foreground="Black"
+                   TextWrapping="Wrap"
+                   Margin="40"/>
 
         <!-- Table area -->
         <ItemsControl Grid.Row="0" ItemsSource="{Binding TableItems}" Margin="10">
@@ -41,7 +56,7 @@ along with BOINC.  If not, see <http://www.gnu.org/licenses/>.
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
                 <DataTemplate>
-                    <Grid>
+                    <Grid Visibility="{Binding IsVisible, Converter={StaticResource BoolToVis}}">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>

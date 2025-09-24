@@ -91,7 +91,7 @@ namespace boinc_buda_runner_wsl_installer
                 {
                     DebugLogger.LogInfo("WSL image is not installed", COMPONENT);
                     result.Status = BudaRunnerStatus.NotInstalled;
-                    result.Message = $"BOINC BUDA Runner WSL image '{BUDA_RUNNER_IMAGE_NAME}' is not installed";
+                    result.Message = $"BOINC WSL Distro '{BUDA_RUNNER_IMAGE_NAME}' is not installed";
                     result.InitialSetupRequired = true;
                     DebugLogger.LogMethodEnd("CheckBudaRunnerAsync", $"Status: {result.Status}", COMPONENT);
                     return result;
@@ -106,7 +106,7 @@ namespace boinc_buda_runner_wsl_installer
                 {
                     DebugLogger.LogWarning("Version file is missing", COMPONENT);
                     result.Status = BudaRunnerStatus.InstalledNoVersion;
-                    result.Message = "BUDA Runner is installed but version file is missing - reinstallation required";
+                    result.Message = "BOINC WSL Distro is installed but version file is missing - reinstallation required";
                     result.UpdateRequired = true;
                     DebugLogger.LogMethodEnd("CheckBudaRunnerAsync", $"Status: {result.Status}", COMPONENT);
                     return result;
@@ -121,7 +121,7 @@ namespace boinc_buda_runner_wsl_installer
                 {
                     DebugLogger.LogWarning("Version could not be read from file", COMPONENT);
                     result.Status = BudaRunnerStatus.InstalledNoVersion;
-                    result.Message = "BUDA Runner is installed but version could not be read - reinstallation required";
+                    result.Message = "BOINC WSL Distro is installed but version could not be read - reinstallation required";
                     result.UpdateRequired = true;
                     DebugLogger.LogMethodEnd("CheckBudaRunnerAsync", $"Status: {result.Status}", COMPONENT);
                     return result;
@@ -136,13 +136,13 @@ namespace boinc_buda_runner_wsl_installer
                 {
                     DebugLogger.LogInfo($"Update required: {result.VersionInfo.CurrentVersion} -> {result.VersionInfo.LatestVersion}", COMPONENT);
                     result.Status = BudaRunnerStatus.InstalledOutdated;
-                    result.Message = $"BUDA Runner v{result.VersionInfo.CurrentVersion} is outdated. Latest version is v{result.VersionInfo.LatestVersion}";
+                    result.Message = $"BOINC WSL Distro v{result.VersionInfo.CurrentVersion} is outdated. Latest version is v{result.VersionInfo.LatestVersion}";
                 }
                 else
                 {
-                    DebugLogger.LogInfo("BUDA Runner is up to date", COMPONENT);
+                    DebugLogger.LogInfo("BOINC WSL Distro is up to date", COMPONENT);
                     result.Status = BudaRunnerStatus.InstalledUpToDate;
-                    result.Message = $"BUDA Runner v{result.VersionInfo.CurrentVersion} is up to date";
+                    result.Message = $"BOINC WSL Distro v{result.VersionInfo.CurrentVersion} is up to date";
                 }
 
                 DebugLogger.LogMethodEnd("CheckBudaRunnerAsync", $"Status: {result.Status}", COMPONENT);
@@ -153,7 +153,7 @@ namespace boinc_buda_runner_wsl_installer
                 DebugLogger.LogException(ex, "Error in CheckBudaRunnerAsync", COMPONENT);
                 result.Status = BudaRunnerStatus.Error;
                 result.ErrorMessage = ex.Message;
-                result.Message = $"Error checking BUDA Runner: {ex.Message}";
+                result.Message = $"Error checking BOINC WSL Distro: {ex.Message}";
                 DebugLogger.LogMethodEnd("CheckBudaRunnerAsync", $"Status: {result.Status} (Exception)", COMPONENT);
                 return result;
             }
@@ -943,22 +943,22 @@ namespace boinc_buda_runner_wsl_installer
             switch (result.Status)
             {
                 case BudaRunnerStatus.NotInstalled:
-                    message = "BOINC BUDA Runner is not installed";
+                    message = "BOINC WSL Distro is not installed";
                     break;
                 case BudaRunnerStatus.InstalledUpToDate:
-                    message = $"BUDA Runner v{result.VersionInfo.CurrentVersion} is up to date";
+                    message = $"BOINC WSL Distro v{result.VersionInfo.CurrentVersion} is up to date";
                     break;
                 case BudaRunnerStatus.InstalledOutdated:
-                    message = $"BUDA Runner v{result.VersionInfo.CurrentVersion} is outdated (latest: v{result.VersionInfo.LatestVersion})";
+                    message = $"BOINC WSL Distro v{result.VersionInfo.CurrentVersion} is outdated (latest: v{result.VersionInfo.LatestVersion})";
                     break;
                 case BudaRunnerStatus.InstalledNoVersion:
-                    message = "BUDA Runner is installed but version cannot be determined";
+                    message = "BOINC WSL Distro is installed but version cannot be determined";
                     break;
                 case BudaRunnerStatus.Error:
-                    message = $"Error checking BUDA Runner: {result.ErrorMessage}";
+                    message = $"Error checking BOINC WSL Distro: {result.ErrorMessage}";
                     break;
                 default:
-                    message = "Unknown BUDA Runner status";
+                    message = "Unknown BOINC WSL Distro status";
                     break;
             }
 

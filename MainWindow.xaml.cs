@@ -33,6 +33,7 @@ namespace boinc_buda_runner_wsl_installer
     public partial class MainWindow : Window
     {
         public ObservableCollection<TableRow> TableItems { get; set; }
+        private bool _isInstalling = false; // track if installation is in progress
 
         public MainWindow()
         {
@@ -43,12 +44,12 @@ namespace boinc_buda_runner_wsl_installer
 
             TableItems = new ObservableCollection<TableRow>
             {
-                new TableRow { Id = ID.ApplicationUpdate, Icon = "", Status = "Check installer update" },
-                new TableRow { Id = ID.WindowsVersion, Icon = "", Status = "Check Windows version" },
-                new TableRow { Id = ID.WindowsFeatures, Icon = "", Status = "Check Windows features" },
-                new TableRow { Id = ID.WslCheck, Icon = "", Status = "Check WSL installation" },
-                new TableRow { Id = ID.BoincProcessCheck, Icon = "", Status = "Check BOINC process" },
-                new TableRow { Id = ID.BudaRunnerCheck, Icon = "", Status = "Check BUDA Runner installation" }
+                new TableRow { Id = ID.ApplicationUpdate, Icon = "", Status = "Check installer update", IsVisible=false },
+                new TableRow { Id = ID.WindowsVersion, Icon = "", Status = "Check Windows version", IsVisible=false },
+                new TableRow { Id = ID.WindowsFeatures, Icon = "", Status = "Check Windows features", IsVisible=false },
+                new TableRow { Id = ID.WslCheck, Icon = "", Status = "Check WSL installation", IsVisible=false },
+                new TableRow { Id = ID.BoincProcessCheck, Icon = "", Status = "Check BOINC process", IsVisible=false },
+                new TableRow { Id = ID.BudaRunnerCheck, Icon = "", Status = "Check BOINC WSL Distro installation", IsVisible=false }
             };
             DataContext = this;
 
@@ -56,28 +57,55 @@ namespace boinc_buda_runner_wsl_installer
             DebugLogger.LogConfiguration("Initial table items count", TableItems.Count, "MainWindow");
         }
 
+        private void ResetInstallationSteps()
+        {
+            DebugLogger.LogInfo("Resetting installation steps (hiding rows and restoring initial text)", "MainWindow");
+            foreach (var row in TableItems)
+            {
+                row.IsVisible = false;
+                row.Icon = string.Empty;
+                switch (row.Id)
+                {
+                    case ID.ApplicationUpdate:
+                        row.Status = "Check installer update"; break;
+                    case ID.WindowsVersion:
+                        row.Status = "Check Windows version"; break;
+                    case ID.WindowsFeatures:
+                        row.Status = "Check Windows features"; break;
+                    case ID.WslCheck:
+                        row.Status = "Check WSL installation"; break;
+                    case ID.BoincProcessCheck:
+                        row.Status = "Check BOINC process"; break;
+                    case ID.BudaRunnerCheck:
+                        row.Status = "Check BOINC WSL Distro installation"; break;
+                }
+            }
+        }
+
         protected override void OnClosing(CancelEventArgs e)
         {
             DebugLogger.LogMethodStart("OnClosing", component: "MainWindow");
 
-            var result = MessageBox.Show(
-                "Are you sure you want to exit the installer?",
-                "Confirm Exit",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Question);
-
-            DebugLogger.LogInfo($"Exit confirmation dialog result: {result}", "MainWindow");
-
-            if (result != MessageBoxResult.Yes)
+            if (_isInstalling)
             {
-                e.Cancel = true;
-                DebugLogger.LogMethodEnd("OnClosing", "cancelled by user", "MainWindow");
-                return;
+                var result = MessageBox.Show(
+                    "Installation is currently in progress. Are you sure you want to exit?",
+                    "Confirm Exit",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Warning);
+
+                DebugLogger.LogInfo($"Installation in progress exit confirmation dialog result: {result}", "MainWindow");
+                if (result != MessageBoxResult.Yes)
+                {
+                    e.Cancel = true;
+                    DebugLogger.LogMethodEnd("OnClosing", "cancelled by user during installation", "MainWindow");
+                    return;
+                }
             }
 
-            DebugLogger.LogInfo("User confirmed exit, shutting down application", "MainWindow");
-            DebugLogger.LogMethodEnd("OnClosing", component: "MainWindow");
+            DebugLogger.LogInfo("Application closing", "MainWindow");
             DebugLogger.Flush();
+            DebugLogger.LogMethodEnd("OnClosing", component: "MainWindow");
             base.OnClosing(e);
         }
 
@@ -284,7 +312,7 @@ namespace boinc_buda_runner_wsl_installer
             DebugLogger.LogMethodStart("CheckBudaRunner", component: "MainWindow");
 
             // Update UI to show we're checking BUDA Runner
-            ChangeRowIconAndStatus(ID.BudaRunnerCheck, "BlueInfoIcon", "Checking BUDA Runner installation...");
+            ChangeRowIconAndStatus(ID.BudaRunnerCheck, "BlueInfoIcon", "Checking BOINC WSL Distro installation...");
 
             // Allow UI to update
             await Task.Delay(100);
@@ -309,7 +337,7 @@ namespace boinc_buda_runner_wsl_installer
 
                     case BudaRunnerCheck.BudaRunnerStatus.NotInstalled:
                         DebugLogger.LogInfo("BUDA Runner is not installed, attempting installation", "MainWindow");
-                        ChangeRowIconAndStatus(ID.BudaRunnerCheck, "YellowExclamationIcon", "BUDA Runner is not installed");
+                        ChangeRowIconAndStatus(ID.BudaRunnerCheck, "YellowExclamationIcon", "BOINC WSL Distro is not installed");
                         var installResult = await InstallBudaRunner(budaResult);
                         DebugLogger.LogMethodEnd("CheckBudaRunner", $"{installResult} (install attempted)", "MainWindow");
                         return installResult;
@@ -335,7 +363,7 @@ namespace boinc_buda_runner_wsl_installer
             catch (System.Exception ex)
             {
                 DebugLogger.LogException(ex, "Error occurred while checking BUDA Runner", "MainWindow");
-                ChangeRowIconAndStatus(ID.BudaRunnerCheck, "YellowExclamationIcon", "Error occurred while checking BUDA Runner");
+                ChangeRowIconAndStatus(ID.BudaRunnerCheck, "YellowExclamationIcon", "Error occurred while checking BOINC WSL Distro");
                 DebugLogger.LogMethodEnd("CheckBudaRunner", "true (exception, continue anyway)", "MainWindow");
                 // Offer to report issue
                 PromptOpenIssue("BUDA Runner check exception", ex.ToString());
@@ -362,27 +390,27 @@ namespace boinc_buda_runner_wsl_installer
                 if (success)
                 {
                     DebugLogger.LogInfo("BUDA Runner installation completed successfully", "MainWindow");
-                    ChangeRowIconAndStatus(ID.BudaRunnerCheck, "GreenCheckboxIcon", "BUDA Runner installed and configured successfully");
+                    ChangeRowIconAndStatus(ID.BudaRunnerCheck, "GreenCheckboxIcon", "BOINC WSL Distro installed and configured successfully");
                     DebugLogger.LogMethodEnd("InstallBudaRunner", "true", "MainWindow");
                     return true;
                 }
                 else
                 {
                     DebugLogger.LogError("BUDA Runner installation failed", "MainWindow");
-                    ChangeRowIconAndStatus(ID.BudaRunnerCheck, "RedCancelIcon", "Failed to install BUDA Runner");
+                    ChangeRowIconAndStatus(ID.BudaRunnerCheck, "RedCancelIcon", "Failed to install BOINC WSL Distro");
                     DebugLogger.LogMethodEnd("InstallBudaRunner", "false", "MainWindow");
                     // Offer to report issue
-                    PromptOpenIssue("BUDA Runner installation failed", "Failed to install BUDA Runner");
+                    PromptOpenIssue("BOINC WSL Distro installation failed", "Failed to install BOINC WSL Distro");
                     return false;
                 }
             }
             catch (System.Exception ex)
             {
                 DebugLogger.LogException(ex, "BUDA Runner installation failed", "MainWindow");
-                ChangeRowIconAndStatus(ID.BudaRunnerCheck, "RedCancelIcon", $"BUDA Runner installation failed: {ex.Message}");
+                ChangeRowIconAndStatus(ID.BudaRunnerCheck, "RedCancelIcon", $"BOINC WSL Distro installation failed: {ex.Message}");
                 DebugLogger.LogMethodEnd("InstallBudaRunner", "false (exception)", "MainWindow");
                 // Offer to report issue
-                PromptOpenIssue("BUDA Runner installation exception", ex.ToString());
+                PromptOpenIssue("BOINC WSL Distro installation exception", ex.ToString());
                 return false;
             }
         }
@@ -493,123 +521,114 @@ namespace boinc_buda_runner_wsl_installer
             DebugLogger.LogSeparator("Installation Process Started");
             DebugLogger.LogMethodStart("InstallButton_Click", component: "MainWindow");
 
-            // First, ensure this installer is the latest version and restart if it was updated
+            if (IntroTextBlock != null && IntroTextBlock.Visibility == Visibility.Visible)
+            {
+                IntroTextBlock.Visibility = Visibility.Collapsed; // hide intro once installation begins
+            }
+
+            var installButton = sender as Button;
+            if (installButton != null)
+            {
+                // If this is a retry (button content may be 'Retry') we hide existing steps
+                if (installButton.Content != null && installButton.Content.ToString().Equals("Retry", StringComparison.OrdinalIgnoreCase))
+                {
+                    ResetInstallationSteps();
+                    if (IntroTextBlock != null) IntroTextBlock.Visibility = Visibility.Collapsed; // ensure hidden on retry
+                }
+                installButton.IsEnabled = false;
+                DebugLogger.LogInfo("Install button disabled during execution", "MainWindow");
+            }
+
+            bool success = false; // track overall result
+            _isInstalling = true; // mark installation started
+
             try
             {
-                ChangeRowIconAndStatus(ID.ApplicationUpdate, "BlueInfoIcon", "Checking for installer updates...");
-                await Task.Delay(50);
-                var updateTriggered = await CheckApplicationUpdateAsync();
-                if (updateTriggered)
-                {
-                    DebugLogger.LogInfo("Update triggered, stopping further processing", "MainWindow");
-                    return; // The app will close; updater will restart the new version
-                }
-            }
-            catch (Exception ex)
-            {
-                ChangeRowIconAndStatus(ID.ApplicationUpdate, "YellowExclamationIcon", "Could not check for installer updates");
-                DebugLogger.LogException(ex, "Self-update check failed (continuing without update)", "MainWindow");
-            }
-
-            // Show confirmation dialog
-            var result = MessageBox.Show(
-                "This will install BOINC BUDA Runner with WSL support on your system.\n\nDo you want to continue?",
-                "Confirm Installation",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Question);
-
-            DebugLogger.LogInfo($"User confirmation dialog result: {result}", "MainWindow");
-
-            if (result == MessageBoxResult.Yes)
-            {
-                // Disable the install button during execution to prevent multiple clicks
-                var installButton = sender as Button;
-                if (installButton != null)
-                {
-                    installButton.IsEnabled = false;
-                    DebugLogger.LogInfo("Install button disabled during execution", "MainWindow");
-                }
-
                 try
                 {
-                    // Update UI to show we're checking Windows version
-                    ChangeRowIconAndStatus(ID.WindowsVersion, "BlueInfoIcon", "Checking Windows version...");
+                    ChangeRowIconAndStatus(ID.ApplicationUpdate, "BlueInfoIcon", "Checking for installer updates...");
+                    await Task.Delay(50);
+                    await CheckApplicationUpdateAsync();
+                }
+                catch (Exception ex)
+                {
+                    ChangeRowIconAndStatus(ID.ApplicationUpdate, "YellowExclamationIcon", "Could not check for installer updates");
+                    DebugLogger.LogException(ex, "Self-update check failed (continuing without update)", "MainWindow");
+                }
 
-                    // Allow UI to update
-                    await Task.Delay(100);
-
-                    var res = CheckWindowsVersionCompatibility();
-                    if (!res)
-                    {
-                        DebugLogger.LogError("Windows version is not supported", "MainWindow");
-                        MessageBox.Show(
-                            "Your Windows version is not supported for this installation.",
-                            "Unsupported Version",
-                            MessageBoxButton.OK,
-                            MessageBoxImage.Error);
-                        return;
-                    }
-
-                    // Check Windows features asynchronously
-                    res = await CheckWindowsFeatures();
-                    if (!res)
-                    {
-                        DebugLogger.LogError("Windows features check/installation failed", "MainWindow");
-                        return;
-                    }
-
-                    // Check WSL asynchronously
-                    res = await CheckWsl();
-                    if (!res)
-                    {
-                        DebugLogger.LogError("WSL check/installation failed", "MainWindow");
-                        return;
-                    }
-
-                    // Check BOINC process asynchronously
-                    res = await CheckBoincProcess();
-                    if (!res)
-                    {
-                        DebugLogger.LogError("BOINC process check failed", "MainWindow");
-                        return;
-                    }
-
-                    // Check BUDA Runner asynchronously (final step)
-                    res = await CheckBudaRunner();
-                    if (!res)
-                    {
-                        DebugLogger.LogError("BUDA Runner check/installation failed", "MainWindow");
-                        return;
-                    }
-
-                    // All checks passed - installation complete
-                    await Task.Delay(100); // Allow final UI update
-
-                    DebugLogger.LogInfo("Installation completed successfully", "MainWindow");
+                ChangeRowIconAndStatus(ID.WindowsVersion, "BlueInfoIcon", "Checking Windows version...");
+                await Task.Delay(100);
+                var res = CheckWindowsVersionCompatibility();
+                if (!res)
+                {
+                    DebugLogger.LogError("Windows version is not supported", "MainWindow");
                     MessageBox.Show(
-                        "BOINC BUDA Runner installation completed successfully!\n\nAll system requirements are met and BOINC BUDA Runner is installed and ready to use.",
-                        "Installation Complete",
+                        "Your Windows version is not supported for this installation.",
+                        "Unsupported Version",
                         MessageBoxButton.OK,
-                        MessageBoxImage.Information);
+                        MessageBoxImage.Error);
+                    return; // failure
                 }
-                catch (System.Exception ex)
+
+                res = await CheckWindowsFeatures();
+                if (!res)
                 {
-                    DebugLogger.LogException(ex, "Unexpected error during installation", "MainWindow");
+                    DebugLogger.LogError("Windows features check/installation failed", "MainWindow");
+                    return; // failure
                 }
-                finally
+
+                res = await CheckWsl();
+                if (!res)
                 {
-                    // Re-enable the install button
-                    if (installButton != null)
+                    DebugLogger.LogError("WSL check/installation failed", "MainWindow");
+                    return; // failure
+                }
+
+                res = await CheckBoincProcess();
+                if (!res)
+                {
+                    DebugLogger.LogError("BOINC process check failed", "MainWindow");
+                    return; // failure
+                }
+
+                res = await CheckBudaRunner();
+                if (!res)
+                {
+                    DebugLogger.LogError("BOINC WSL Distro check/installation failed", "MainWindow");
+                    return; // failure
+                }
+
+                await Task.Delay(100);
+                DebugLogger.LogInfo("Installation completed successfully", "MainWindow");
+                MessageBox.Show(
+                    "BOINC WSL Distro installation completed successfully!\n\nAll system requirements are met and BOINC WSL Distro is installed and ready to use.",
+                    "Installation Complete",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                success = true; // mark success
+            }
+            catch (System.Exception ex)
+            {
+                DebugLogger.LogException(ex, "Unexpected error during installation", "MainWindow");
+            }
+            finally
+            {
+                _isInstalling = false; // installation ended
+                if (installButton != null)
+                {
+                    if (!success)
                     {
                         installButton.IsEnabled = true;
-                        DebugLogger.LogInfo("Install button re-enabled", "MainWindow");
+                        installButton.Content = "Retry"; // allow retry on failure
+                        DebugLogger.LogInfo("Install button re-enabled for retry", "MainWindow");
                     }
-                    DebugLogger.LogSeparator("Installation Process Completed");
+                    else
+                    {
+                        installButton.IsEnabled = false; // keep disabled on success
+                        DebugLogger.LogInfo("Install succeeded; button remains disabled", "MainWindow");
+                    }
                 }
-            }
-            else
-            {
-                DebugLogger.LogInfo("User cancelled installation", "MainWindow");
+                DebugLogger.LogSeparator("Installation Process Completed");
             }
 
             DebugLogger.LogMethodEnd("InstallButton_Click", component: "MainWindow");
@@ -627,11 +646,12 @@ namespace boinc_buda_runner_wsl_installer
 
         private void ChangeRowIconAndStatus(ID id, string newIcon, string status)
         {
-            var rowIndex = TableItems.IndexOf(TableItems.FirstOrDefault(item => item.Id == id));
-            if (rowIndex >= 0 && rowIndex < TableItems.Count)
+            var row = TableItems.FirstOrDefault(item => item.Id == id);
+            if (row != null)
             {
-                TableItems[rowIndex].Icon = newIcon;
-                TableItems[rowIndex].Status = status;
+                if (!row.IsVisible) row.IsVisible = true; // reveal step when first updated
+                row.Icon = newIcon;
+                row.Status = status;
                 DebugLogger.LogUIStatusChange(id.ToString(), newIcon, status);
             }
             else

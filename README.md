@@ -1,6 +1,6 @@
-# BOINC BUDA Runner WSL Installer
+# BOINC WSL Distro Installer
 
-A Windows desktop installer that prepares your system to run BOINC BUDA Runner under Windows Subsystem for Linux (WSL) and installs or updates BUDA Runner for you.
+A Windows desktop installer that prepares your system to run the BOINC WSL Distro (BOINC environment under Windows Subsystem for Linux 2) and installs or updates it for you.
 
 The app is a WPF application targeting .NET Framework 4.8.
 
@@ -20,9 +20,9 @@ The installer performs a sequence of checks and guided actions:
   - Installs WSL if missing, or fixes common configuration issues.
   - Sets the default WSL version to 2.
 - Check BOINC process
-  - Detects if a BOINC client is currently running. If running, you�ll be asked to stop it before continuing.
-- Check BUDA Runner
-  - Installs or updates BUDA Runner to the latest version, or confirms that it�s up to date.
+  - Detects if a BOINC client is currently running. If running, you’ll be asked to stop it before continuing.
+- Check BOINC WSL Distro
+  - Installs or updates the BOINC WSL Distro to the latest version, or confirms that it’s up to date.
 
 ## Requirements
 
@@ -32,7 +32,7 @@ The installer performs a sequence of checks and guided actions:
 - Administrator privileges
   - Enabling Windows features and installing WSL require elevation. Run the installer as Administrator.
 - Internet access
-  - Required to query GitHub releases, download WSL (when needed), and download BUDA Runner.
+  - Required to query GitHub releases, download WSL (when needed), and download the BOINC WSL Distro.
 
 ## Quick start
 
@@ -41,7 +41,7 @@ The installer performs a sequence of checks and guided actions:
 2. Right-click the downloaded installer executable and choose "Run as administrator".
 3. Click "Install".
 4. Follow on-screen prompts. If a restart is required after enabling Windows features, restart and re-run the installer.
-5. When all checks pass, BUDA Runner will be installed and ready to use.
+5. When all checks pass, the BOINC WSL Distro will be installed and ready to use.
 
 ## UI overview
 
@@ -50,7 +50,7 @@ The installer performs a sequence of checks and guided actions:
 - `Exit`
   - Closes the application. A confirmation dialog is shown. The same confirmation appears when closing the window via the system close button (X).
 - `Open Log`
-  - Opens the current debug log file in your system�s default editor.
+  - Opens the current debug log file in your system’s default editor.
 
 The main view shows a list of steps with a status icon and text updated as the installer runs.
 
@@ -64,7 +64,7 @@ The main view shows a list of steps with a status icon and text updated as the i
 ## Network endpoints used
 
 - GitHub Releases API to check for updates to this installer.
-- Official sources to download WSL and BUDA Runner artifacts when needed.
+- Official sources to download WSL and BOINC WSL Distro artifacts when needed.
 
 ## Build from source
 
@@ -84,7 +84,7 @@ Project notes:
 
 ## Limitations
 
-- The installer does not self-update. When a newer installer is available, you�ll be informed and can download it from the Releases page.
+- The installer does not self-update. When a newer installer is available, you’ll be informed and can download it from the Releases page.
 - If BOINC is running, installation is paused until the user stops BOINC.
 
 ## Contributing
