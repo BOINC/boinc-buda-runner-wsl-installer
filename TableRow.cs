@@ -34,6 +34,7 @@ namespace boinc_buda_runner_wsl_installer
         private ID _id;
         private string _icon;
         private string _status;
+        private bool _isVisible; // new visibility flag
 
         public ID Id
         {
@@ -70,6 +71,19 @@ namespace boinc_buda_runner_wsl_installer
                 {
                     _status = value;
                     OnPropertyChanged(nameof(Status));
+                }
+            }
+        }
+
+        public bool IsVisible
+        {
+            get => _isVisible;
+            set
+            {
+                if (_isVisible != value)
+                {
+                    _isVisible = value;
+                    OnPropertyChanged(nameof(IsVisible));
                 }
             }
         }
