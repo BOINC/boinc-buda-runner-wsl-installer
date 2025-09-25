@@ -34,6 +34,7 @@ namespace boinc_buda_runner_wsl_installer
     {
         public ObservableCollection<TableRow> TableItems { get; set; }
         private bool _isInstalling = false; // track if installation is in progress
+        internal bool LastWindowsFeaturesRestartRequired { get; private set; } // quiet-mode detail
 
         public MainWindow()
         {
@@ -109,7 +110,7 @@ namespace boinc_buda_runner_wsl_installer
             base.OnClosing(e);
         }
 
-        private bool CheckWindowsVersionCompatibility()
+        internal bool CheckWindowsVersionCompatibility()
         {
             DebugLogger.LogMethodStart("CheckWindowsVersionCompatibility", component: "MainWindow");
 
@@ -128,14 +129,24 @@ namespace boinc_buda_runner_wsl_installer
             ChangeRowIconAndStatus(ID.WindowsVersion, versionIcon, "Windows version: " + windowsVersion);
 
             var isSupported = windowsInfo.Status == WindowsVersionCheck.WindowsVersionStatus.Supported;
-            DebugLogger.LogMethodEnd("CheckWindowsVersionCompatibility", isSupported.ToString(), "MainWindow");
+            if (!isSupported && !App.IsQuiet)
+            {
+                MessageBox.Show(
+                    "Your Windows version is not supported for this installation.",
+                    "Unsupported Version",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
 
+            DebugLogger.LogMethodEnd("CheckWindowsVersionCompatibility", isSupported.ToString(), "MainWindow");
             return isSupported;
         }
 
-        private async Task<bool> CheckWindowsFeatures()
+        internal async Task<bool> CheckWindowsFeatures()
         {
             DebugLogger.LogMethodStart("CheckWindowsFeatures", component: "MainWindow");
+
+            LastWindowsFeaturesRestartRequired = false;
 
             // Update UI to show we're checking features
             ChangeRowIconAndStatus(ID.WindowsFeatures, "BlueInfoIcon", "Checking Windows features...");
@@ -169,13 +180,17 @@ namespace boinc_buda_runner_wsl_installer
                 // Check if restart is required
                 if (WindowsFeaturesCheck.IsRestartRequired(enableResult.FeatureResults))
                 {
+                    LastWindowsFeaturesRestartRequired = true;
                     DebugLogger.LogWarning("Restart required after enabling Windows features", "MainWindow");
                     ChangeRowIconAndStatus(ID.WindowsFeatures, "YellowExclamationIcon", "Features enabled - restart required");
-                    MessageBox.Show(
-                        "Windows features have been enabled but require a restart.\n\nPlease restart your computer and run this installation again.",
-                        "Computer restart is required",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Warning);
+                    if (!App.IsQuiet)
+                    {
+                        MessageBox.Show(
+                            "Windows features have been enabled but require a restart.\n\nPlease restart your computer and run this installation again.",
+                            "Computer restart is required",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Warning);
+                    }
                     DebugLogger.LogMethodEnd("CheckWindowsFeatures", "false (restart required)", "MainWindow");
                     return false;
                 }
@@ -192,7 +207,7 @@ namespace boinc_buda_runner_wsl_installer
             return true;
         }
 
-        private async Task<bool> CheckWsl()
+        internal async Task<bool> CheckWsl()
         {
             DebugLogger.LogMethodStart("CheckWsl", component: "MainWindow");
 
@@ -249,7 +264,7 @@ namespace boinc_buda_runner_wsl_installer
             }
         }
 
-        private async Task<bool> CheckBoincProcess()
+        internal async Task<bool> CheckBoincProcess()
         {
             DebugLogger.LogMethodStart("CheckBoincProcess", component: "MainWindow");
 
@@ -271,12 +286,15 @@ namespace boinc_buda_runner_wsl_installer
                         DebugLogger.LogWarning($"BOINC process is running: {boincResult.Message}", "MainWindow");
                         ChangeRowIconAndStatus(ID.BoincProcessCheck, "RedCancelIcon", boincResult.Message);
 
-                        // Show instruction to stop BOINC (do NOT offer to create an issue here)
-                        MessageBox.Show(
-                            $"BOINC client is currently running and may interfere with the installation.\n\nPlease stop the running BOINC client and retry the installation.",
-                            $"{boincResult.Message}",
-                            MessageBoxButton.OK,
-                            MessageBoxImage.Warning);
+                        if (!App.IsQuiet)
+                        {
+                            // Show instruction to stop BOINC (do NOT offer to create an issue here)
+                            MessageBox.Show(
+                                $"BOINC client is currently running and may interfere with the installation.\n\nPlease stop the running BOINC client and retry the installation.",
+                                $"{boincResult.Message}",
+                                MessageBoxButton.OK,
+                                MessageBoxImage.Warning);
+                        }
                         DebugLogger.LogMethodEnd("CheckBoincProcess", "false (BOINC running)", "MainWindow");
                         return false;
 
@@ -307,7 +325,7 @@ namespace boinc_buda_runner_wsl_installer
             }
         }
 
-        private async Task<bool> CheckBudaRunner()
+        internal async Task<bool> CheckBudaRunner()
         {
             DebugLogger.LogMethodStart("CheckBudaRunner", component: "MainWindow");
 
@@ -562,11 +580,14 @@ namespace boinc_buda_runner_wsl_installer
                 if (!res)
                 {
                     DebugLogger.LogError("Windows version is not supported", "MainWindow");
-                    MessageBox.Show(
-                        "Your Windows version is not supported for this installation.",
-                        "Unsupported Version",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Error);
+                    if (!App.IsQuiet)
+                    {
+                        MessageBox.Show(
+                            "Your Windows version is not supported for this installation.",
+                            "Unsupported Version",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Error);
+                    }
                     return; // failure
                 }
 
@@ -600,11 +621,14 @@ namespace boinc_buda_runner_wsl_installer
 
                 await Task.Delay(100);
                 DebugLogger.LogInfo("Installation completed successfully", "MainWindow");
-                MessageBox.Show(
-                    "BOINC WSL Distro installation completed successfully!\n\nAll system requirements are met and BOINC WSL Distro is installed and ready to use.",
-                    "Installation Complete",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
+                if (!App.IsQuiet)
+                {
+                    MessageBox.Show(
+                        "BOINC WSL Distro installation completed successfully!\n\nAll system requirements are met and BOINC WSL Distro is installed and ready to use.",
+                        "Installation Complete",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+                }
                 success = true; // mark success
             }
             catch (System.Exception ex)
@@ -644,7 +668,7 @@ namespace boinc_buda_runner_wsl_installer
             DebugLogger.LogMethodEnd("ExitButton_Click", component: "MainWindow");
         }
 
-        private void ChangeRowIconAndStatus(ID id, string newIcon, string status)
+        internal void ChangeRowIconAndStatus(ID id, string newIcon, string status)
         {
             var row = TableItems.FirstOrDefault(item => item.Id == id);
             if (row != null)
@@ -684,15 +708,22 @@ namespace boinc_buda_runner_wsl_installer
                 var url = repoNewIssueUrl + "?title=" + Uri.EscapeDataString(title ?? "Installer error")
                           + "&body=" + Uri.EscapeDataString(sb.ToString());
 
-                var ask = MessageBox.Show(
-                    "An error occurred. Would you like to report it on GitHub? Your debug log file path will be included in the report so you can attach it.",
-                    "Report Error",
-                    MessageBoxButton.YesNo,
-                    MessageBoxImage.Question);
-
-                if (ask == MessageBoxResult.Yes)
+                if (!App.IsQuiet)
                 {
-                    Process.Start(url);
+                    var ask = MessageBox.Show(
+                        "An error occurred. Would you like to report it on GitHub? Your debug log file path will be included in the report so you can attach it.",
+                        "Report Error",
+                        MessageBoxButton.YesNo,
+                        MessageBoxImage.Question);
+
+                    if (ask == MessageBoxResult.Yes)
+                    {
+                        Process.Start(url);
+                    }
+                }
+                else
+                {
+                    DebugLogger.LogInfo($"Issue report URL (quiet mode): {url}", "MainWindow");
                 }
             }
             catch (Exception ex)
@@ -740,7 +771,7 @@ namespace boinc_buda_runner_wsl_installer
             }
         }
 
-        private static Version TryGetCurrentFileVersion(string exePath)
+        internal static Version TryGetCurrentFileVersion(string exePath)
         {
             try
             {
@@ -757,7 +788,7 @@ namespace boinc_buda_runner_wsl_installer
             return null;
         }
 
-        private async Task<bool> CheckApplicationUpdateAsync()
+        internal async Task<bool> CheckApplicationUpdateAsync()
         {
             DebugLogger.LogMethodStart("CheckApplicationUpdateAsync", component: "MainWindow");
 
@@ -839,13 +870,15 @@ namespace boinc_buda_runner_wsl_installer
                 var logPath = DebugLogger.LogFilePath;
                 if (string.IsNullOrEmpty(logPath))
                 {
-                    MessageBox.Show("Log file is not available yet.", "Open Log", MessageBoxButton.OK, MessageBoxImage.Information);
+                    if (!App.IsQuiet)
+                        MessageBox.Show("Log file is not available yet.", "Open Log", MessageBoxButton.OK, MessageBoxImage.Information);
                     return;
                 }
 
                 if (!System.IO.File.Exists(logPath))
                 {
-                    MessageBox.Show("Log file does not exist.", "Open Log", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    if (!App.IsQuiet)
+                        MessageBox.Show("Log file does not exist.", "Open Log", MessageBoxButton.OK, MessageBoxImage.Warning);
                     return;
                 }
 
@@ -859,7 +892,8 @@ namespace boinc_buda_runner_wsl_installer
             catch (Exception ex)
             {
                 DebugLogger.LogException(ex, "Failed to open log file", "MainWindow");
-                MessageBox.Show("Failed to open the log file.", "Open Log", MessageBoxButton.OK, MessageBoxImage.Error);
+                if (!App.IsQuiet)
+                    MessageBox.Show("Failed to open the log file.", "Open Log", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
     }

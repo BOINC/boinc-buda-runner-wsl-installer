@@ -22,7 +22,7 @@ using System.Text;
 namespace boinc_buda_runner_wsl_installer
 {
     /// <summary>
-    /// Debug logging utility that writes verbose information to a log file
+    /// Debug logging utility that writes verbose information to a log file and optionally to console
     /// </summary>
     internal static class DebugLogger
     {
@@ -30,6 +30,22 @@ namespace boinc_buda_runner_wsl_installer
         private static bool _isEnabled = true; // Always enabled
         private static readonly object _lockObject = new object();
         private static bool _initialized = false;
+
+        // Console logging configuration
+        private static bool _consoleInfoEnabled = false;
+        private static bool _consoleDebugEnabled = false;
+        private static bool _consoleErrorEnabled = false;
+
+        /// <summary>
+        /// Configure console logging behavior (stdout/stderr). INFO and WARN go to stdout if infoEnabled;
+        /// DEBUG goes to stdout if debugEnabled; ERROR goes to stderr if errorEnabled.
+        /// </summary>
+        public static void ConfigureConsoleLogging(bool infoEnabled, bool debugEnabled, bool errorEnabled)
+        {
+            _consoleInfoEnabled = infoEnabled;
+            _consoleDebugEnabled = debugEnabled;
+            _consoleErrorEnabled = errorEnabled;
+        }
 
         /// <summary>
         /// Gets or sets whether debug logging is enabled
@@ -70,7 +86,7 @@ namespace boinc_buda_runner_wsl_installer
                 // Create the initial log entry
                 LogInfo($"Debug logging started at {DateTime.Now:yyyy-MM-dd HH:mm:ss}", "DebugLogger");
                 LogInfo($"Log file: {_logFilePath}", "DebugLogger");
-                LogInfo($"Application: BOINC BUDA Runner WSL Installer", "DebugLogger");
+                LogInfo($"Application: BOINC WSL Distro Installer", "DebugLogger");
                 LogInfo($"Application Version: 2.0.0", "DebugLogger");
                 LogInfo($"Windows Version: {Environment.OSVersion}", "DebugLogger");
                 LogInfo($"Is 64-bit OS: {Environment.Is64BitOperatingSystem}", "DebugLogger");
@@ -187,31 +203,56 @@ namespace boinc_buda_runner_wsl_installer
         /// </summary>
         private static void Log(string level, string message, string component)
         {
-            if (!_isEnabled)
-                return;
-
-            if (string.IsNullOrEmpty(_logFilePath))
+            // Write to file
+            if (_isEnabled)
             {
-                InitializeLogFile();
-                if (string.IsNullOrEmpty(_logFilePath)) return;
+                if (string.IsNullOrEmpty(_logFilePath))
+                {
+                    InitializeLogFile();
+                }
+                try
+                {
+                    if (!string.IsNullOrEmpty(_logFilePath))
+                    {
+                        lock (_lockObject)
+                        {
+                            var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+                            var threadId = System.Threading.Thread.CurrentThread.ManagedThreadId;
+                            var componentPart = !string.IsNullOrEmpty(component) ? $"[{component}] " : "";
+                            var logEntry = $"{timestamp} [{level}] [T{threadId:D2}] {componentPart}{message}";
+                            File.AppendAllText(_logFilePath, logEntry + Environment.NewLine, Encoding.UTF8);
+                        }
+                    }
+                }
+                catch { }
             }
 
+            // Write to console according to configuration
             try
             {
-                lock (_lockObject)
+                if (level == "ERROR")
                 {
-                    var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
-                    var threadId = System.Threading.Thread.CurrentThread.ManagedThreadId;
-                    var componentPart = !string.IsNullOrEmpty(component) ? $"[{component}] " : "";
-                    var logEntry = $"{timestamp} [{level}] [T{threadId:D2}] {componentPart}{message}";
-
-                    File.AppendAllText(_logFilePath, logEntry + Environment.NewLine, Encoding.UTF8);
+                    if (_consoleErrorEnabled)
+                    {
+                        Console.Error.WriteLine(message);
+                    }
+                }
+                else if (level == "DEBUG")
+                {
+                    if (_consoleDebugEnabled)
+                    {
+                        Console.Out.WriteLine(message);
+                    }
+                }
+                else // INFO or WARN
+                {
+                    if (_consoleInfoEnabled)
+                    {
+                        Console.Out.WriteLine(message);
+                    }
                 }
             }
-            catch
-            {
-                // Silently ignore logging errors to prevent app crashes
-            }
+            catch { }
         }
 
         /// <summary>
