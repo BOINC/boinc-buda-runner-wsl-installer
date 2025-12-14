@@ -154,57 +154,88 @@ namespace boinc_buda_runner_wsl_installer
             // Allow UI to update
             await Task.Delay(100);
 
-            // Check all required features
-            var checkResult = await WindowsFeaturesCheck.CheckRequiredFeaturesAsync();
-            DebugLogger.LogInfo($"Windows features check completed. All enabled: {checkResult.AllFeaturesEnabled}", "MainWindow");
-
-            foreach (var feature in checkResult.FeatureResults)
+            try
             {
-                DebugLogger.LogConfiguration($"Feature {feature.FeatureName}", $"Status: {feature.Status}, Message: {feature.Message}", "MainWindow");
-            }
+                // Check all required features
+                var checkResult = await WindowsFeaturesCheck.CheckRequiredFeaturesAsync();
+                DebugLogger.LogInfo($"Windows features check completed. All enabled: {checkResult.AllFeaturesEnabled}", "MainWindow");
 
-            if (!checkResult.AllFeaturesEnabled)
-            {
-                DebugLogger.LogInfo("Some Windows features are disabled, attempting to enable them", "MainWindow");
-
-                // Update UI to show we're enabling features
-                ChangeRowIconAndStatus(ID.WindowsFeatures, "YellowExclamationIcon", "Enabling missing Windows features...");
-
-                // Allow UI to update
-                await Task.Delay(100);
-
-                // Enable missing features
-                var enableResult = await WindowsFeaturesCheck.EnableRequiredFeaturesAsync();
-                DebugLogger.LogInfo($"Windows features enable completed. Success: {enableResult.AllFeaturesEnabled}", "MainWindow");
-
-                // Check if restart is required
-                if (WindowsFeaturesCheck.IsRestartRequired(enableResult.FeatureResults))
+                foreach (var feature in checkResult.FeatureResults)
                 {
-                    LastWindowsFeaturesRestartRequired = true;
-                    DebugLogger.LogWarning("Restart required after enabling Windows features", "MainWindow");
-                    ChangeRowIconAndStatus(ID.WindowsFeatures, "YellowExclamationIcon", "Features enabled - restart required");
-                    if (!App.IsQuiet)
-                    {
-                        MessageBox.Show(
-                            "Windows features have been enabled but require a restart.\n\nPlease restart your computer and run this installation again.",
-                            "Computer restart is required",
-                            MessageBoxButton.OK,
-                            MessageBoxImage.Warning);
-                    }
-                    DebugLogger.LogMethodEnd("CheckWindowsFeatures", "false (restart required)", "MainWindow");
-                    return false;
+                    DebugLogger.LogConfiguration($"Feature {feature.FeatureName}", $"Status: {feature.Status}, Message: {feature.Message}", "MainWindow");
                 }
 
-                // Features were enabled successfully
-                ChangeRowIconAndStatus(ID.WindowsFeatures, "GreenCheckboxIcon", "Windows features enabled successfully");
-                DebugLogger.LogMethodEnd("CheckWindowsFeatures", "true (features enabled)", "MainWindow");
+                if (!checkResult.AllFeaturesEnabled)
+                {
+                    DebugLogger.LogInfo("Some Windows features are disabled, attempting to enable them", "MainWindow");
+
+                    // Update UI to show we're enabling features
+                    ChangeRowIconAndStatus(ID.WindowsFeatures, "YellowExclamationIcon", "Enabling missing Windows features...");
+
+                    // Allow UI to update
+                    await Task.Delay(100);
+
+                    // Enable missing features
+                    var enableResult = await WindowsFeaturesCheck.EnableRequiredFeaturesAsync();
+                    DebugLogger.LogInfo($"Windows features enable completed. Success: {enableResult.AllFeaturesEnabled}", "MainWindow");
+
+                    // Check if restart is required
+                    if (WindowsFeaturesCheck.IsRestartRequired(enableResult.FeatureResults))
+                    {
+                        LastWindowsFeaturesRestartRequired = true;
+                        DebugLogger.LogWarning("Restart required after enabling Windows features", "MainWindow");
+                        ChangeRowIconAndStatus(ID.WindowsFeatures, "YellowExclamationIcon", "Features enabled - restart required");
+                        if (!App.IsQuiet)
+                        {
+                            MessageBox.Show(
+                                "Windows features have been enabled but require a restart.\n\nPlease restart your computer and run this installation again.",
+                                "Computer restart is required",
+                                MessageBoxButton.OK,
+                                MessageBoxImage.Warning);
+                        }
+                        DebugLogger.LogMethodEnd("CheckWindowsFeatures", "false (restart required)", "MainWindow");
+                        return false;
+                    }
+
+                    // Features were enabled successfully
+                    if (enableResult.AllFeaturesEnabled)
+                    {
+                        ChangeRowIconAndStatus(ID.WindowsFeatures, "GreenCheckboxIcon", "Windows features enabled successfully");
+                        DebugLogger.LogMethodEnd("CheckWindowsFeatures", "true (features enabled)", "MainWindow");
+                        return true;
+                    }
+                    else
+                    {
+                        // Some features failed to enable
+                        ChangeRowIconAndStatus(ID.WindowsFeatures, "RedCancelIcon", "Failed to enable some Windows features");
+                        DebugLogger.LogError("Failed to enable some required Windows features", "MainWindow");
+                        
+                        var failedFeatures = string.Join(", ", enableResult.FeatureResults
+                            .Where(f => f.Status != WindowsFeaturesCheck.WindowsFeatureStatus.Enabled)
+                            .Select(f => f.FeatureName));
+                        
+                        PromptOpenIssue("Windows features enable failed", 
+                            $"Failed to enable required Windows features: {failedFeatures}. " +
+                            $"Error details: {string.Join("; ", enableResult.FeatureResults.Select(f => f.Message))}");
+                        
+                        DebugLogger.LogMethodEnd("CheckWindowsFeatures", "false (enable failed)", "MainWindow");
+                        return false;
+                    }
+                }
+
+                // All features were already enabled
+                ChangeRowIconAndStatus(ID.WindowsFeatures, "GreenCheckboxIcon", "All Windows features are already enabled");
+                DebugLogger.LogMethodEnd("CheckWindowsFeatures", "true (all features already enabled)", "MainWindow");
                 return true;
             }
-
-            // All features were already enabled
-            ChangeRowIconAndStatus(ID.WindowsFeatures, "GreenCheckboxIcon", "All Windows features are already enabled");
-            DebugLogger.LogMethodEnd("CheckWindowsFeatures", "true (all features already enabled)", "MainWindow");
-            return true;
+            catch (Exception ex)
+            {
+                DebugLogger.LogException(ex, "Error occurred while checking Windows features", "MainWindow");
+                ChangeRowIconAndStatus(ID.WindowsFeatures, "RedCancelIcon", "Error checking Windows features");
+                PromptOpenIssue("Windows features check exception", ex.ToString());
+                DebugLogger.LogMethodEnd("CheckWindowsFeatures", "false (exception)", "MainWindow");
+                return false;
+            }
         }
 
         internal async Task<bool> CheckWsl()
@@ -250,7 +281,11 @@ namespace boinc_buda_runner_wsl_installer
                         DebugLogger.LogError($"WSL check failed with status: {wslResult.Status}", "MainWindow");
                         ChangeRowIconAndStatus(ID.WslCheck, "RedCancelIcon", WslCheck.GetStatusDisplayMessage(wslResult));
                         DebugLogger.LogMethodEnd("CheckWsl", "false (WSL error)", "MainWindow");
-                        PromptOpenIssue("WSL check error", WslCheck.GetStatusDisplayMessage(wslResult));
+                        PromptOpenIssue("WSL check error", 
+                            $"WSL Status: {wslResult.Status}\n" +
+                            $"Message: {wslResult.Message}\n" +
+                            $"Version Info: {wslResult.VersionInfo?.WslVersion ?? "N/A"}\n" +
+                            $"Default Version: {wslResult.StatusInfo?.DefaultVersion.ToString() ?? "N/A"}");
                         return false;
                 }
             }
@@ -259,7 +294,10 @@ namespace boinc_buda_runner_wsl_installer
                 DebugLogger.LogException(ex, "Error occurred while checking WSL", "MainWindow");
                 ChangeRowIconAndStatus(ID.WslCheck, "RedCancelIcon", "Error occurred while checking WSL");
                 DebugLogger.LogMethodEnd("CheckWsl", "false (exception)", "MainWindow");
-                PromptOpenIssue("WSL check exception", ex.ToString());
+                PromptOpenIssue("WSL check exception", 
+                    $"Exception Type: {ex.GetType().Name}\n" +
+                    $"Message: {ex.Message}\n" +
+                    $"Stack Trace:\n{ex.StackTrace}");
                 return false;
             }
         }
@@ -374,7 +412,13 @@ namespace boinc_buda_runner_wsl_installer
                         ChangeRowIconAndStatus(ID.BudaRunnerCheck, "YellowExclamationIcon", BudaRunnerCheck.GetStatusDisplayMessage(budaResult));
                         DebugLogger.LogMethodEnd("CheckBudaRunner", "true (error, continue anyway)", "MainWindow");
                         // Offer to report issue
-                        PromptOpenIssue("BUDA Runner check error", budaResult.ErrorMessage);
+                        PromptOpenIssue("BUDA Runner check error", 
+                            $"Status: {budaResult.Status}\n" +
+                            $"Error Message: {budaResult.ErrorMessage ?? "N/A"}\n" +
+                            $"Is Installed: {budaResult.VersionInfo.IsInstalled}\n" +
+                            $"Current Version: {budaResult.VersionInfo.CurrentVersion ?? "N/A"}\n" +
+                            $"Latest Version: {budaResult.VersionInfo.LatestVersion ?? "N/A"}\n" +
+                            $"Has Version File: {budaResult.VersionInfo.HasVersionFile}");
                         return true; // Continue despite error
                 }
             }
@@ -384,7 +428,10 @@ namespace boinc_buda_runner_wsl_installer
                 ChangeRowIconAndStatus(ID.BudaRunnerCheck, "YellowExclamationIcon", "Error occurred while checking BOINC WSL Distro");
                 DebugLogger.LogMethodEnd("CheckBudaRunner", "true (exception, continue anyway)", "MainWindow");
                 // Offer to report issue
-                PromptOpenIssue("BUDA Runner check exception", ex.ToString());
+                PromptOpenIssue("BUDA Runner check exception", 
+                    $"Exception Type: {ex.GetType().Name}\n" +
+                    $"Message: {ex.Message}\n" +
+                    $"Stack Trace:\n{ex.StackTrace}");
                 return true; // Continue despite error
             }
         }
@@ -417,8 +464,15 @@ namespace boinc_buda_runner_wsl_installer
                     DebugLogger.LogError("BUDA Runner installation failed", "MainWindow");
                     ChangeRowIconAndStatus(ID.BudaRunnerCheck, "RedCancelIcon", "Failed to install BOINC WSL Distro");
                     DebugLogger.LogMethodEnd("InstallBudaRunner", "false", "MainWindow");
-                    // Offer to report issue
-                    PromptOpenIssue("BOINC WSL Distro installation failed", "Failed to install BOINC WSL Distro");
+                    // Offer to report issue with detailed context
+                    PromptOpenIssue("BOINC WSL Distro installation failed", 
+                        $"Installation Status: Failed\n" +
+                        $"Was Previously Installed: {budaResult.VersionInfo.IsInstalled}\n" +
+                        $"Current Version: {budaResult.VersionInfo.CurrentVersion ?? "N/A"}\n" +
+                        $"Target Version: {budaResult.VersionInfo.LatestVersion ?? "N/A"}\n" +
+                        $"Download URL: {budaResult.DownloadUrl ?? "N/A"}\n" +
+                        $"Update Required: {budaResult.UpdateRequired}\n" +
+                        $"Check the log file for detailed error information.");
                     return false;
                 }
             }
@@ -428,7 +482,12 @@ namespace boinc_buda_runner_wsl_installer
                 ChangeRowIconAndStatus(ID.BudaRunnerCheck, "RedCancelIcon", $"BOINC WSL Distro installation failed: {ex.Message}");
                 DebugLogger.LogMethodEnd("InstallBudaRunner", "false (exception)", "MainWindow");
                 // Offer to report issue
-                PromptOpenIssue("BOINC WSL Distro installation exception", ex.ToString());
+                PromptOpenIssue("BOINC WSL Distro installation exception", 
+                    $"Exception Type: {ex.GetType().Name}\n" +
+                    $"Message: {ex.Message}\n" +
+                    $"Was Previously Installed: {budaResult.VersionInfo.IsInstalled}\n" +
+                    $"Target Version: {budaResult.VersionInfo.LatestVersion ?? "N/A"}\n" +
+                    $"Stack Trace:\n{ex.StackTrace}");
                 return false;
             }
         }
@@ -474,7 +533,9 @@ namespace boinc_buda_runner_wsl_installer
                     ChangeRowIconAndStatus(ID.WslCheck, "RedCancelIcon", "Failed to install WSL");
                     DebugLogger.LogMethodEnd("InstallWsl", "false", "MainWindow");
                     // Offer to report issue
-                    PromptOpenIssue("WSL installation failed", "Failed to install WSL");
+                    PromptOpenIssue("WSL installation failed", 
+                        $"Download URL: {downloadUrl}\n" +
+                        $"Installation failed with no specific error. Check the log file for more details.");
                     return false;
                 }
             }
@@ -484,7 +545,10 @@ namespace boinc_buda_runner_wsl_installer
                 ChangeRowIconAndStatus(ID.WslCheck, "RedCancelIcon", "WSL installation failed");
                 DebugLogger.LogMethodEnd("InstallWsl", "false (exception)", "MainWindow");
                 // Offer to report issue
-                PromptOpenIssue("WSL installation exception", ex.ToString());
+                PromptOpenIssue("WSL installation exception", 
+                    $"Exception Type: {ex.GetType().Name}\n" +
+                    $"Message: {ex.Message}\n" +
+                    $"Stack Trace:\n{ex.StackTrace}");
                 return false;
             }
         }
@@ -518,7 +582,14 @@ namespace boinc_buda_runner_wsl_installer
                     ChangeRowIconAndStatus(ID.WslCheck, "YellowExclamationIcon", "Some WSL issues could not be fixed automatically");
                     DebugLogger.LogMethodEnd("FixWslIssues", "false", "MainWindow");
                     // Offer to report issue
-                    PromptOpenIssue("WSL fix issues could not be resolved", WslCheck.GetStatusDisplayMessage(wslResult));
+                    PromptOpenIssue("WSL fix issues could not be resolved", 
+                        $"WSL Status: {wslResult.Status}\n" +
+                        $"Current Version: {wslResult.VersionInfo?.WslVersion ?? "N/A"}\n" +
+                        $"Latest Version: {wslResult.LatestVersion ?? "N/A"}\n" +
+                        $"Default Version: {wslResult.StatusInfo?.DefaultVersion.ToString() ?? "N/A"}\n" +
+                        $"Update Required: {wslResult.UpdateRequired}\n" +
+                        $"Version Change Required: {wslResult.VersionChangeRequired}\n" +
+                        $"Message: {wslResult.Message}");
                     return false;
                 }
             }
@@ -528,7 +599,11 @@ namespace boinc_buda_runner_wsl_installer
                 ChangeRowIconAndStatus(ID.WslCheck, "RedCancelIcon", "Failed to fix WSL configuration");
                 DebugLogger.LogMethodEnd("FixWslIssues", "false (exception)", "MainWindow");
                 // Offer to report issue
-                PromptOpenIssue("WSL fix exception", ex.ToString());
+                PromptOpenIssue("WSL fix exception", 
+                    $"Exception Type: {ex.GetType().Name}\n" +
+                    $"Message: {ex.Message}\n" +
+                    $"WSL Status: {wslResult.Status}\n" +
+                    $"Stack Trace:\n{ex.StackTrace}");
                 return false;
             }
         }
@@ -688,26 +763,53 @@ namespace boinc_buda_runner_wsl_installer
         {
             try
             {
-                // Build a GitHub new issue URL with prefilled title/body.
-                var repoNewIssueUrl = "https://github.com/BOINC/boinc-buda-runner-wsl-installer/issues/new";
+                // Categorize the error to provide appropriate troubleshooting guidance
+                var errorCategory = TroubleshootingGuide.CategorizeError(title, details);
+                var advice = TroubleshootingGuide.GetAdvice(errorCategory, details);
 
-                var sb = new StringBuilder();
-                sb.AppendLine("Describe the problem and steps to reproduce here.\n");
-                sb.AppendLine("Error context:");
-                sb.AppendLine(details ?? "(no details)");
-                sb.AppendLine();
-                sb.AppendLine($"App version: {FileVersionInfo.GetVersionInfo(Process.GetCurrentProcess().MainModule.FileName).FileVersion}");
-                sb.AppendLine($"OS: {Environment.OSVersion}");
-                sb.AppendLine($"64-bit OS: {Environment.Is64BitOperatingSystem}, 64-bit Process: {Environment.Is64BitProcess}");
-                sb.AppendLine();
-                if (!string.IsNullOrEmpty(DebugLogger.LogFilePath))
+                if (!App.IsQuiet)
                 {
-                    sb.AppendLine($"Log file path (attach this file in the issue): {DebugLogger.LogFilePath}");
+                    // Show troubleshooting dialog instead of simple message box
+                    var dialog = new TroubleshootingDialog(advice, details)
+                    {
+                        Owner = this
+                    };
+                    dialog.ShowDialog();
                 }
+                else
+                {
+                    // In quiet mode, log the troubleshooting information
+                    var formattedAdvice = TroubleshootingGuide.FormatAdviceAsMessage(advice);
+                    DebugLogger.LogInfo($"Troubleshooting guidance for '{title}':\n{formattedAdvice}", "MainWindow");
+                    
+                    // Build a GitHub new issue URL with prefilled title/body for logging purposes
+                    var repoNewIssueUrl = "https://github.com/BOINC/boinc-buda-runner-wsl-installer/issues/new";
 
-                var url = repoNewIssueUrl + "?title=" + Uri.EscapeDataString(title ?? "Installer error")
-                          + "&body=" + Uri.EscapeDataString(sb.ToString());
+                    var sb = new StringBuilder();
+                    sb.AppendLine("Describe the problem and steps to reproduce here.\n");
+                    sb.AppendLine("Error context:");
+                    sb.AppendLine(details ?? "(no details)");
+                    sb.AppendLine();
+                    sb.AppendLine($"App version: {FileVersionInfo.GetVersionInfo(Process.GetCurrentProcess().MainModule.FileName).FileVersion}");
+                    sb.AppendLine($"OS: {Environment.OSVersion}");
+                    sb.AppendLine($"64-bit OS: {Environment.Is64BitOperatingSystem}, 64-bit Process: {Environment.Is64BitProcess}");
+                    sb.AppendLine();
+                    if (!string.IsNullOrEmpty(DebugLogger.LogFilePath))
+                    {
+                        sb.AppendLine($"Log file path (attach this file in the issue): {DebugLogger.LogFilePath}");
+                    }
 
+                    var url = repoNewIssueUrl + "?title=" + Uri.EscapeDataString(title ?? "Installer error")
+                              + "&body=" + Uri.EscapeDataString(sb.ToString());
+                    
+                    DebugLogger.LogInfo($"Issue report URL (quiet mode): {url}", "MainWindow");
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.LogException(ex, "Failed to show troubleshooting guidance", "MainWindow");
+                
+                // Fallback to old behavior if troubleshooting dialog fails
                 if (!App.IsQuiet)
                 {
                     var ask = MessageBox.Show(
@@ -718,17 +820,32 @@ namespace boinc_buda_runner_wsl_installer
 
                     if (ask == MessageBoxResult.Yes)
                     {
-                        Process.Start(url);
+                        try
+                        {
+                            var repoNewIssueUrl = "https://github.com/BOINC/boinc-buda-runner-wsl-installer/issues/new";
+                            var sb = new StringBuilder();
+                            sb.AppendLine("Describe the problem and steps to reproduce here.\n");
+                            sb.AppendLine("Error context:");
+                            sb.AppendLine(details ?? "(no details)");
+                            sb.AppendLine();
+                            sb.AppendLine($"App version: {FileVersionInfo.GetVersionInfo(Process.GetCurrentProcess().MainModule.FileName).FileVersion}");
+                            sb.AppendLine($"OS: {Environment.OSVersion}");
+                            sb.AppendLine($"64-bit OS: {Environment.Is64BitOperatingSystem}, 64-bit Process: {Environment.Is64BitProcess}");
+                            if (!string.IsNullOrEmpty(DebugLogger.LogFilePath))
+                            {
+                                sb.AppendLine($"Log file path (attach this file in the issue): {DebugLogger.LogFilePath}");
+                            }
+
+                            var url = repoNewIssueUrl + "?title=" + Uri.EscapeDataString(title ?? "Installer error")
+                                      + "&body=" + Uri.EscapeDataString(sb.ToString());
+                            Process.Start(url);
+                        }
+                        catch (Exception innerEx)
+                        {
+                            DebugLogger.LogException(innerEx, "Failed to open GitHub issue link", "MainWindow");
+                        }
                     }
                 }
-                else
-                {
-                    DebugLogger.LogInfo($"Issue report URL (quiet mode): {url}", "MainWindow");
-                }
-            }
-            catch (Exception ex)
-            {
-                DebugLogger.LogException(ex, "Failed to create/open GitHub issue link", "MainWindow");
             }
         }
 
