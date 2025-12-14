@@ -26,7 +26,7 @@
     <UpdateRequired>false</UpdateRequired>
     <MapFileExtensions>true</MapFileExtensions>
     <ApplicationRevision>0</ApplicationRevision>
-    <ApplicationVersion>2.1.0.%2a</ApplicationVersion>
+    <ApplicationVersion>2.2.0.%2a</ApplicationVersion>
     <IsWebBootstrapper>false</IsWebBootstrapper>
     <UseApplicationTrust>false</UseApplicationTrust>
     <BootstrapperEnabled>true</BootstrapperEnabled>
@@ -81,6 +81,10 @@
     <Compile Include="BoincProcessCheck.cs" />
     <Compile Include="BudaRunnerCheck.cs" />
     <Compile Include="DebugLogger.cs" />
+    <Compile Include="TroubleshootingDialog.xaml.cs">
+      <DependentUpon>TroubleshootingDialog.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="TroubleshootingGuide.cs" />
     <Compile Include="WindowsFeaturesCheck.cs" />
     <Compile Include="WindowsVersionCheck.cs" />
     <Compile Include="TableRow.cs" />
@@ -97,6 +101,10 @@
       <DependentUpon>MainWindow.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
+    <Page Include="TroubleshootingDialog.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Properties\AssemblyInfo.cs">
@@ -123,6 +131,7 @@
       <LastGenOutput>Settings.Designer.cs</LastGenOutput>
     </None>
     <None Include="README.md" />
+    <None Include="TROUBLESHOOTING.md" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />

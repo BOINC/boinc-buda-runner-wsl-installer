@@ -1,0 +1,92 @@
+<Window x:Class="boinc_buda_runner_wsl_installer.TroubleshootingDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Troubleshooting Guidance" 
+        Height="550" 
+        Width="650" 
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False"
+        ResizeMode="CanResize"
+        MinHeight="400"
+        MinWidth="500">
+    <Window.Resources>
+        <Style TargetType="TextBlock">
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Margin" Value="0,0,0,8"/>
+        </Style>
+    </Window.Resources>
+    
+    <Grid Margin="15">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Title -->
+        <TextBlock Grid.Row="0" 
+                   x:Name="TitleTextBlock"
+                   FontSize="18" 
+                   FontWeight="Bold" 
+                   Margin="0,0,0,15"/>
+
+        <!-- Content -->
+        <ScrollViewer Grid.Row="1" 
+                     VerticalScrollBarVisibility="Auto"
+                     Margin="0,0,0,15">
+            <StackPanel>
+                <!-- Description -->
+                <TextBlock x:Name="DescriptionTextBlock" 
+                          FontSize="13"
+                          Margin="0,0,0,15"
+                          TextWrapping="Wrap"/>
+
+                <!-- Steps -->
+                <TextBlock x:Name="StepsTextBlock"
+                          FontFamily="Consolas"
+                          FontSize="12"
+                          Background="#F5F5F5"
+                          Padding="10"
+                          TextWrapping="Wrap"/>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Resources -->
+        <Expander Grid.Row="2" 
+                 x:Name="ResourcesExpander"
+                 Header="Additional Resources"
+                 IsExpanded="False"
+                 Margin="0,0,0,15">
+            <TextBlock x:Name="ResourcesTextBlock"
+                      FontSize="11"
+                      Padding="10,5,0,5"
+                      TextWrapping="Wrap"/>
+        </Expander>
+
+        <!-- Buttons -->
+        <StackPanel Grid.Row="3" 
+                   Orientation="Horizontal" 
+                   HorizontalAlignment="Right">
+            <Button x:Name="CopyButton" 
+                   Content="Copy to Clipboard" 
+                   Width="130" 
+                   Height="30" 
+                   Margin="0,0,10,0"
+                   Click="CopyButton_Click"/>
+            <Button x:Name="ReportIssueButton" 
+                   Content="Report Issue on GitHub" 
+                   Width="160" 
+                   Height="30" 
+                   Margin="0,0,10,0"
+                   Click="ReportIssueButton_Click"
+                   Visibility="Visible"/>
+            <Button x:Name="CloseButton" 
+                   Content="Close" 
+                   Width="80" 
+                   Height="30" 
+                   IsDefault="True"
+                   Click="CloseButton_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>
