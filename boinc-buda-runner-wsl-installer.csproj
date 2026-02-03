@@ -26,7 +26,7 @@
     <UpdateRequired>false</UpdateRequired>
     <MapFileExtensions>true</MapFileExtensions>
     <ApplicationRevision>0</ApplicationRevision>
-    <ApplicationVersion>2.2.0.%2a</ApplicationVersion>
+    <ApplicationVersion>2.2.1.%2a</ApplicationVersion>
     <IsWebBootstrapper>false</IsWebBootstrapper>
     <UseApplicationTrust>false</UseApplicationTrust>
     <BootstrapperEnabled>true</BootstrapperEnabled>
@@ -81,6 +81,7 @@
     <Compile Include="BoincProcessCheck.cs" />
     <Compile Include="BudaRunnerCheck.cs" />
     <Compile Include="DebugLogger.cs" />
+    <Compile Include="DownloadVerification.cs" />
     <Compile Include="TroubleshootingDialog.xaml.cs">
       <DependentUpon>TroubleshootingDialog.xaml</DependentUpon>
     </Compile>

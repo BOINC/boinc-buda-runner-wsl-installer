@@ -1,6 +1,6 @@
 ﻿// This file is part of BOINC.
 // https://boinc.berkeley.edu
-// Copyright (C) 2025 University of California
+// Copyright (C) 2026 University of California
 //
 // BOINC is free software; you can redistribute it and/or modify it
 // under the terms of the GNU Lesser General Public License
@@ -81,7 +81,14 @@ namespace boinc_buda_runner_wsl_installer
                 await Task.Delay(10);
                 await window.CheckApplicationUpdateAsync();
 
-                // 2) Windows version
+                // 2) BOINC process must not run
+                var boincOk = await window.CheckBoincProcess();
+                if (!boincOk)
+                {
+                    return ErrBoincRunning;
+                }
+
+                // 3) Windows version
                 window.ChangeRowIconAndStatus(ID.WindowsVersion, "BlueInfoIcon", "Checking Windows version...");
                 await Task.Delay(10);
                 var isSupported = window.CheckWindowsVersionCompatibility();
@@ -91,7 +98,7 @@ namespace boinc_buda_runner_wsl_installer
                     return ErrUnsupportedWindows;
                 }
 
-                // 3) Windows features
+                // 4) Windows features
                 var featuresOk = await window.CheckWindowsFeatures();
                 if (!featuresOk)
                 {
@@ -100,18 +107,11 @@ namespace boinc_buda_runner_wsl_installer
                     return ErrWindowsFeaturesEnableFailed;
                 }
 
-                // 4) WSL check and install/fix
+                // 5) WSL check and install/fix
                 var wslOk = await window.CheckWsl();
                 if (!wslOk)
                 {
                     return ErrWslCheckOrInstallFailed;
-                }
-
-                // 5) BOINC process must not run
-                var boincOk = await window.CheckBoincProcess();
-                if (!boincOk)
-                {
-                    return ErrBoincRunning;
                 }
 
                 // 6) BUDA Runner check/install

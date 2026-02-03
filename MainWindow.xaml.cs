@@ -1,6 +1,6 @@
 ﻿// This file is part of BOINC.
 // https://boinc.berkeley.edu
-// Copyright (C) 2025 University of California
+// Copyright (C) 2026 University of California
 //
 // BOINC is free software; you can redistribute it and/or modify it
 // under the terms of the GNU Lesser General Public License
@@ -46,10 +46,10 @@ namespace boinc_buda_runner_wsl_installer
             TableItems = new ObservableCollection<TableRow>
             {
                 new TableRow { Id = ID.ApplicationUpdate, Icon = "", Status = "Check installer update", IsVisible=false },
+                new TableRow { Id = ID.BoincProcessCheck, Icon = "", Status = "Check BOINC process", IsVisible=false },
                 new TableRow { Id = ID.WindowsVersion, Icon = "", Status = "Check Windows version", IsVisible=false },
                 new TableRow { Id = ID.WindowsFeatures, Icon = "", Status = "Check Windows features", IsVisible=false },
                 new TableRow { Id = ID.WslCheck, Icon = "", Status = "Check WSL installation", IsVisible=false },
-                new TableRow { Id = ID.BoincProcessCheck, Icon = "", Status = "Check BOINC process", IsVisible=false },
                 new TableRow { Id = ID.BudaRunnerCheck, Icon = "", Status = "Check BOINC WSL Distro installation", IsVisible=false }
             };
             DataContext = this;
@@ -508,11 +508,14 @@ namespace boinc_buda_runner_wsl_installer
                 });
 
                 // Get the latest WSL download URL
-                var downloadUrl = await WslCheck.GetLatestWslDownloadUrlAsync();
-                DebugLogger.LogConfiguration("WSL Download URL", downloadUrl, "MainWindow");
+                var downloadInfo = await WslCheck.GetLatestWslDownloadInfoAsync();
+                var downloadUrl = downloadInfo?.DownloadUrl;
+                var downloadSha256 = downloadInfo?.Sha256;
+                DebugLogger.LogConfiguration("WSL Download URL", downloadUrl ?? "null", "MainWindow");
+                DebugLogger.LogConfiguration("WSL Download SHA256", downloadSha256 ?? "null", "MainWindow");
 
                 // Download and install WSL
-                bool success = await WslCheck.DownloadAndInstallLatestWslAsync(downloadUrl, progress);
+                bool success = await WslCheck.DownloadAndInstallLatestWslAsync(downloadUrl, downloadSha256, progress);
 
                 if (success)
                 {
@@ -666,6 +669,13 @@ namespace boinc_buda_runner_wsl_installer
                     return; // failure
                 }
 
+                res = await CheckBoincProcess();
+                if (!res)
+                {
+                    DebugLogger.LogError("BOINC process check failed", "MainWindow");
+                    return; // failure
+                }
+
                 res = await CheckWindowsFeatures();
                 if (!res)
                 {
@@ -677,13 +687,6 @@ namespace boinc_buda_runner_wsl_installer
                 if (!res)
                 {
                     DebugLogger.LogError("WSL check/installation failed", "MainWindow");
-                    return; // failure
-                }
-
-                res = await CheckBoincProcess();
-                if (!res)
-                {
-                    DebugLogger.LogError("BOINC process check failed", "MainWindow");
                     return; // failure
                 }
 

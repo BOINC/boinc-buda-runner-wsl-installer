@@ -1,6 +1,6 @@
 // This file is part of BOINC.
 // https://boinc.berkeley.edu
-// Copyright (C) 2025 University of California
+// Copyright (C) 2026 University of California
 //
 // BOINC is free software; you can redistribute it and/or modify it
 // under the terms of the GNU Lesser General Public License
@@ -87,7 +87,7 @@ namespace boinc_buda_runner_wsl_installer
                 LogInfo($"Debug logging started at {DateTime.Now:yyyy-MM-dd HH:mm:ss}", "DebugLogger");
                 LogInfo($"Log file: {_logFilePath}", "DebugLogger");
                 LogInfo($"Application: BOINC WSL Distro Installer", "DebugLogger");
-                LogInfo($"Application Version: 2.2.0", "DebugLogger");
+                LogInfo($"Application Version: 2.2.1", "DebugLogger");
                 LogInfo($"Windows Version: {Environment.OSVersion}", "DebugLogger");
                 LogInfo($"Is 64-bit OS: {Environment.Is64BitOperatingSystem}", "DebugLogger");
                 LogInfo($"Is 64-bit Process: {Environment.Is64BitProcess}", "DebugLogger");
