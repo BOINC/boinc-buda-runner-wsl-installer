@@ -1,6 +1,6 @@
 // This file is part of BOINC.
 // https://boinc.berkeley.edu
-// Copyright (C) 2025 University of California
+// Copyright (C) 2026 University of California
 //
 // BOINC is free software; you can redistribute it and/or modify it
 // under the terms of the GNU Lesser General Public License
@@ -58,8 +58,16 @@ namespace boinc_buda_runner_wsl_installer
             public WslStatusInfo StatusInfo { get; set; }
             public string LatestVersion { get; set; }
             public string DownloadUrl { get; set; }
+            public string DownloadSha256 { get; set; }
             public bool UpdateRequired { get; set; }
             public bool VersionChangeRequired { get; set; }
+        }
+
+        public class WslDownloadInfo
+        {
+            public string DownloadUrl { get; set; }
+            public string Sha256 { get; set; }
+            public string FileName { get; set; }
         }
 
         /// <summary>
@@ -101,9 +109,12 @@ namespace boinc_buda_runner_wsl_installer
                 // Step 3: Get latest version from GitHub
                 DebugLogger.LogInfo("Step 3: Getting latest version from GitHub", COMPONENT);
                 result.LatestVersion = await GetLatestWslVersionFromGitHubAsync();
-                result.DownloadUrl = await GetLatestWslDownloadUrlAsync();
+                var downloadInfo = await GetLatestWslDownloadInfoAsync();
+                result.DownloadUrl = downloadInfo?.DownloadUrl;
+                result.DownloadSha256 = downloadInfo?.Sha256;
                 DebugLogger.LogConfiguration("Latest Version", result.LatestVersion, COMPONENT);
                 DebugLogger.LogConfiguration("Download URL", result.DownloadUrl, COMPONENT);
+                DebugLogger.LogConfiguration("Download SHA256", result.DownloadSha256 ?? "null", COMPONENT);
 
                 // Step 4: Compare versions and determine status
                 DebugLogger.LogInfo("Step 4: Comparing versions and determining requirements", COMPONENT);
@@ -302,11 +313,19 @@ namespace boinc_buda_runner_wsl_installer
         /// </summary>
         public static async Task<string> GetLatestWslDownloadUrlAsync()
         {
-            DebugLogger.LogMethodStart("GetLatestWslDownloadUrlAsync", component: COMPONENT);
+            var info = await GetLatestWslDownloadInfoAsync();
+            return info?.DownloadUrl;
+        }
+
+        /// <summary>
+        /// Gets the download URL and expected SHA256 hash for the latest WSL installer
+        /// </summary>
+        public static async Task<WslDownloadInfo> GetLatestWslDownloadInfoAsync()
+        {
+            DebugLogger.LogMethodStart("GetLatestWslDownloadInfoAsync", component: COMPONENT);
 
             try
             {
-                // Detect OS architecture using the same method as WindowsVersionCheck
                 string architecture = GetSystemArchitecture();
                 DebugLogger.LogConfiguration("Detected Architecture", architecture, COMPONENT);
 
@@ -317,31 +336,28 @@ namespace boinc_buda_runner_wsl_installer
                     DebugLogger.LogInfo("Fetching WSL download URLs from GitHub", COMPONENT);
                     var response = await httpClient.GetStringAsync("https://api.github.com/repos/microsoft/WSL/releases/latest");
 
-                    // Find all MSI or MSIX download URLs using regex
                     var downloadMatches = Regex.Matches(response, @"""browser_download_url"":\s*""([^""]+\.(?:msi|msix))""");
                     DebugLogger.LogConfiguration("Download Matches Found", downloadMatches.Count, COMPONENT);
 
                     if (downloadMatches.Count > 0)
                     {
-                        // Try to find architecture-specific installer
                         string preferredUrl = FindArchitectureSpecificInstaller(downloadMatches, architecture);
                         if (!string.IsNullOrEmpty(preferredUrl))
                         {
+                            var info = BuildWslDownloadInfo(response, preferredUrl);
                             DebugLogger.LogConfiguration("Architecture-Specific URL", preferredUrl, COMPONENT);
-                            DebugLogger.LogMethodEnd("GetLatestWslDownloadUrlAsync", preferredUrl, COMPONENT);
-                            return preferredUrl;
+                            DebugLogger.LogMethodEnd("GetLatestWslDownloadInfoAsync", preferredUrl, COMPONENT);
+                            return info;
                         }
 
-                        // If no architecture-specific installer found, return the first available
                         var fallbackUrl = downloadMatches[0].Groups[1].Value;
+                        var fallbackInfo = BuildWslDownloadInfo(response, fallbackUrl);
                         DebugLogger.LogConfiguration("Fallback URL", fallbackUrl, COMPONENT);
-                        DebugLogger.LogMethodEnd("GetLatestWslDownloadUrlAsync", fallbackUrl, COMPONENT);
-                        return fallbackUrl;
+                        DebugLogger.LogMethodEnd("GetLatestWslDownloadInfoAsync", fallbackUrl, COMPONENT);
+                        return fallbackInfo;
                     }
-                    else
-                    {
-                        DebugLogger.LogWarning("No WSL installer download URLs found in GitHub response", COMPONENT);
-                    }
+
+                    DebugLogger.LogWarning("No WSL installer download URLs found in GitHub response", COMPONENT);
                 }
             }
             catch (Exception ex)
@@ -349,11 +365,10 @@ namespace boinc_buda_runner_wsl_installer
                 DebugLogger.LogException(ex, "Error fetching WSL download URL from GitHub", COMPONENT);
             }
 
-            // Return Microsoft Store link as fallback
             var storeUrl = "ms-windows-store://pdp/?ProductId=9P9TQF7MRM4R";
             DebugLogger.LogConfiguration("Using Microsoft Store Fallback", storeUrl, COMPONENT);
-            DebugLogger.LogMethodEnd("GetLatestWslDownloadUrlAsync", storeUrl, COMPONENT);
-            return storeUrl;
+            DebugLogger.LogMethodEnd("GetLatestWslDownloadInfoAsync", storeUrl, COMPONENT);
+            return new WslDownloadInfo { DownloadUrl = storeUrl, Sha256 = null, FileName = null };
         }
 
         /// <summary>
@@ -469,7 +484,7 @@ namespace boinc_buda_runner_wsl_installer
         /// <summary>
         /// Downloads and installs the latest WSL version using msiexec.exe
         /// </summary>
-        public static async Task<bool> DownloadAndInstallLatestWslAsync(string downloadUrl, IProgress<string> progress = null)
+        public static async Task<bool> DownloadAndInstallLatestWslAsync(string downloadUrl, string expectedSha256, IProgress<string> progress = null)
         {
             DebugLogger.LogMethodStart("DownloadAndInstallLatestWslAsync", $"downloadUrl: {downloadUrl}", COMPONENT);
 
@@ -509,10 +524,62 @@ namespace boinc_buda_runner_wsl_installer
                     }
                 }
 
+                if (string.IsNullOrWhiteSpace(expectedSha256))
+                {
+                    DebugLogger.LogError("WSL installer SHA256 hash was not available from GitHub release data", COMPONENT);
+                    progress?.Report("WSL installer verification data unavailable; aborting for safety.");
+                    DebugLogger.LogMethodEnd("DownloadAndInstallLatestWslAsync", "false (missing hash)", COMPONENT);
+                    return false;
+                }
+
+                progress?.Report("Verifying WSL installer integrity...");
+                var actualSha256 = DownloadVerification.ComputeSha256(installerPath);
+                DebugLogger.LogConfiguration("Expected SHA256", expectedSha256, COMPONENT);
+                DebugLogger.LogConfiguration("Actual SHA256", actualSha256 ?? "null", COMPONENT);
+
+                if (!string.Equals(DownloadVerification.NormalizeHash(actualSha256), DownloadVerification.NormalizeHash(expectedSha256), StringComparison.OrdinalIgnoreCase))
+                {
+                    DebugLogger.LogError("WSL installer hash verification failed", COMPONENT);
+                    progress?.Report("WSL installer verification failed. Downloaded file hash does not match.");
+                    try
+                    {
+                        File.Delete(installerPath);
+                    }
+                    catch (Exception ex)
+                    {
+                        DebugLogger.LogException(ex, "Error deleting installer after hash mismatch", COMPONENT);
+                    }
+                    DebugLogger.LogMethodEnd("DownloadAndInstallLatestWslAsync", "false (hash mismatch)", COMPONENT);
+                    return false;
+                }
+
+                var normalizedHash = DownloadVerification.NormalizeHash(actualSha256);
+                var systemRoot = Environment.GetEnvironmentVariable("SystemRoot") ?? Environment.GetEnvironmentVariable("windir");
+                if (string.IsNullOrWhiteSpace(systemRoot))
+                {
+                    throw new InvalidOperationException("SystemRoot environment variable not found.");
+                }
+
+                var downloadRoot = Path.Combine(systemRoot, "Downloaded Installations");
+                var hashFolder = Path.Combine(downloadRoot, normalizedHash);
+                Directory.CreateDirectory(hashFolder);
+
+                var finalInstallerPath = Path.Combine(hashFolder, fileName);
+                if (File.Exists(finalInstallerPath))
+                {
+                    File.Delete(finalInstallerPath);
+                }
+
+                File.Move(installerPath, finalInstallerPath);
+                installerPath = finalInstallerPath;
+
+                DebugLogger.LogConfiguration("Installer Hash Folder", hashFolder, COMPONENT);
+                DebugLogger.LogConfiguration("Installer Final Path", installerPath, COMPONENT);
+
                 progress?.Report("Installing WSL update...");
 
                 // Determine the installer type and appropriate arguments
-                string fileExtension = Path.GetExtension(fileName).ToLowerInvariant();
+                var fileExtension = Path.GetExtension(fileName).ToLowerInvariant();
                 DebugLogger.LogConfiguration("File Extension", fileExtension, COMPONENT);
                 ProcessStartInfo startInfo;
 
@@ -590,17 +657,6 @@ namespace boinc_buda_runner_wsl_installer
                     {
                         await Task.Run(() => process.WaitForExit(300000)); // 5 minute timeout
                         DebugLogger.LogConfiguration("Process Exit Code", process.ExitCode, COMPONENT);
-                    }
-
-                    // Clean up the downloaded installer
-                    try
-                    {
-                        DebugLogger.LogInfo($"Cleaning up installer file: {installerPath}", COMPONENT);
-                        File.Delete(installerPath);
-                    }
-                    catch (Exception ex)
-                    {
-                        DebugLogger.LogException(ex, "Error cleaning up installer file", COMPONENT);
                     }
 
                     // Check exit code for success
@@ -691,7 +747,7 @@ namespace boinc_buda_runner_wsl_installer
                 {
                     DebugLogger.LogInfo("Updating WSL to latest version", COMPONENT);
                     progress?.Report("Updating WSL to latest version...");
-                    success = await DownloadAndInstallLatestWslAsync(checkResult.DownloadUrl, progress);
+                    success = await DownloadAndInstallLatestWslAsync(checkResult.DownloadUrl, checkResult.DownloadSha256, progress);
 
                     if (!success)
                     {
@@ -894,5 +950,26 @@ namespace boinc_buda_runner_wsl_installer
             DebugLogger.LogMethodEnd("GetStatusDisplayMessage", message, COMPONENT);
             return message;
         }
+
+        private static WslDownloadInfo BuildWslDownloadInfo(string releaseJson, string url)
+        {
+            var fileName = Path.GetFileName(new Uri(url).LocalPath);
+            var body = DownloadVerification.ExtractJsonStringValue(releaseJson, "body");
+            var sha256 = DownloadVerification.TryExtractSha256FromBody(body, fileName);
+
+            if (string.IsNullOrEmpty(sha256))
+            {
+                DebugLogger.LogWarning($"Could not find SHA256 hash for {fileName} in GitHub release data", COMPONENT);
+            }
+
+            return new WslDownloadInfo
+            {
+                DownloadUrl = url,
+                Sha256 = sha256,
+                FileName = fileName
+            };
+        }
+
+        
     }
 }

@@ -1,6 +1,6 @@
 // This file is part of BOINC.
 // https://boinc.berkeley.edu
-// Copyright (C) 2025 University of California
+// Copyright (C) 2026 University of California
 //
 // BOINC is free software; you can redistribute it and/or modify it
 // under the terms of the GNU Lesser General Public License
@@ -19,10 +19,10 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Linq;
-using System.Text;
 
 namespace boinc_buda_runner_wsl_installer
 {
@@ -54,9 +54,17 @@ namespace boinc_buda_runner_wsl_installer
             public string Message { get; set; }
             public BudaRunnerVersionInfo VersionInfo { get; set; } = new BudaRunnerVersionInfo();
             public string DownloadUrl { get; set; }
+            public string DownloadSha256 { get; set; }
             public string ErrorMessage { get; set; }
             public bool UpdateRequired { get; set; }
             public bool InitialSetupRequired { get; set; }
+        }
+
+        public class BudaRunnerDownloadInfo
+        {
+            public string DownloadUrl { get; set; }
+            public string Sha256 { get; set; }
+            public string FileName { get; set; }
         }
 
         private const string BUDA_RUNNER_IMAGE_NAME = "boinc-buda-runner";
@@ -83,9 +91,12 @@ namespace boinc_buda_runner_wsl_installer
                 // Step 2: Get latest version from GitHub
                 DebugLogger.LogInfo("Step 2: Getting latest version from GitHub", COMPONENT);
                 result.VersionInfo.LatestVersion = await GetLatestVersionFromGitHubAsync();
-                result.DownloadUrl = await GetLatestDownloadUrlFromGitHubAsync();
+                var downloadInfo = await GetLatestDownloadInfoFromGitHubAsync();
+                result.DownloadUrl = downloadInfo?.DownloadUrl;
+                result.DownloadSha256 = downloadInfo?.Sha256;
                 DebugLogger.LogConfiguration("Latest Version", result.VersionInfo.LatestVersion, COMPONENT);
                 DebugLogger.LogConfiguration("Download URL", result.DownloadUrl, COMPONENT);
+                DebugLogger.LogConfiguration("Download SHA256", result.DownloadSha256 ?? "null", COMPONENT);
 
                 if (!result.VersionInfo.IsInstalled)
                 {
@@ -185,7 +196,7 @@ namespace boinc_buda_runner_wsl_installer
                 // Download and install the latest version
                 DebugLogger.LogInfo($"Downloading latest BUDA Runner from: {checkResult.DownloadUrl}", COMPONENT);
                 progress?.Report("Downloading latest BUDA Runner from GitHub...");
-                string downloadPath = await DownloadLatestReleaseAsync(checkResult.DownloadUrl, progress);
+                string downloadPath = await DownloadLatestReleaseAsync(checkResult.DownloadUrl, checkResult.DownloadSha256, progress);
                 DebugLogger.LogConfiguration("Download Path", downloadPath ?? "null", COMPONENT);
 
                 if (string.IsNullOrEmpty(downloadPath))
@@ -505,6 +516,15 @@ namespace boinc_buda_runner_wsl_installer
         /// </summary>
         private static async Task<string> GetLatestDownloadUrlFromGitHubAsync()
         {
+            var info = await GetLatestDownloadInfoFromGitHubAsync();
+            return info?.DownloadUrl;
+        }
+
+        /// <summary>
+        /// Gets the download URL and expected SHA256 hash for the latest release
+        /// </summary>
+        private static async Task<BudaRunnerDownloadInfo> GetLatestDownloadInfoFromGitHubAsync()
+        {
             DebugLogger.LogMethodStart("GetLatestDownloadUrlFromGitHubAsync", component: COMPONENT);
 
             const string fallbackUrl = "https://github.com/BOINC/boinc-buda-runner-wsl/releases/latest";
@@ -554,9 +574,10 @@ namespace boinc_buda_runner_wsl_installer
                         }
 
                         var resultUrl = preferredUrl ?? firstUrl;
+                        var info = BuildBudaRunnerDownloadInfo(response, resultUrl);
                         DebugLogger.LogConfiguration("Selected Download URL", resultUrl, COMPONENT);
                         DebugLogger.LogMethodEnd("GetLatestDownloadUrlFromGitHubAsync", resultUrl, COMPONENT);
-                        return resultUrl;
+                        return info;
                     }
                     else
                     {
@@ -571,13 +592,13 @@ namespace boinc_buda_runner_wsl_installer
 
             DebugLogger.LogConfiguration("Using Fallback URL", fallbackUrl, COMPONENT);
             DebugLogger.LogMethodEnd("GetLatestDownloadUrlFromGitHubAsync", fallbackUrl, COMPONENT);
-            return fallbackUrl;
+            return new BudaRunnerDownloadInfo { DownloadUrl = fallbackUrl, Sha256 = null, FileName = null };
         }
 
         /// <summary>
         /// Downloads the latest release from GitHub
         /// </summary>
-        private static async Task<string> DownloadLatestReleaseAsync(string downloadUrl, IProgress<string> progress = null)
+        private static async Task<string> DownloadLatestReleaseAsync(string downloadUrl, string expectedSha256, IProgress<string> progress = null)
         {
             DebugLogger.LogMethodStart("DownloadLatestReleaseAsync", $"downloadUrl: {downloadUrl}", COMPONENT);
 
@@ -611,13 +632,39 @@ namespace boinc_buda_runner_wsl_installer
                     DebugLogger.LogInfo($"Download completed successfully: {filePath}", COMPONENT);
                 }
 
+                if (string.IsNullOrWhiteSpace(expectedSha256))
+                {
+                    DebugLogger.LogError("BUDA Runner download SHA256 hash was not available from GitHub release data", COMPONENT);
+                    progress?.Report("BUDA Runner verification data unavailable; aborting for safety.");
+                    return null;
+                }
+
+                progress?.Report("Verifying BUDA Runner archive integrity...");
+                var actualSha256 = DownloadVerification.ComputeSha256(filePath);
+                DebugLogger.LogConfiguration("Expected SHA256", expectedSha256, COMPONENT);
+                DebugLogger.LogConfiguration("Actual SHA256", actualSha256 ?? "null", COMPONENT);
+
+                if (!string.Equals(DownloadVerification.NormalizeHash(actualSha256), DownloadVerification.NormalizeHash(expectedSha256), StringComparison.OrdinalIgnoreCase))
+                {
+                    DebugLogger.LogError("BUDA Runner archive hash verification failed", COMPONENT);
+                    progress?.Report("BUDA Runner verification failed. Downloaded file hash does not match.");
+                    try
+                    {
+                        File.Delete(filePath);
+                    }
+                    catch (Exception ex)
+                    {
+                        DebugLogger.LogException(ex, "Error deleting BUDA Runner archive after hash mismatch", COMPONENT);
+                    }
+                    return null;
+                }
+
                 // Verify file exists and get size
                 if (File.Exists(filePath))
                 {
                     var fileInfo = new FileInfo(filePath);
                     DebugLogger.LogConfiguration("Downloaded File Size", $"{fileInfo.Length} bytes", COMPONENT);
                 }
-
                 DebugLogger.LogMethodEnd("DownloadLatestReleaseAsync", filePath, COMPONENT);
                 return filePath;
             }
@@ -629,6 +676,26 @@ namespace boinc_buda_runner_wsl_installer
                 return null;
             }
         }
+
+        private static BudaRunnerDownloadInfo BuildBudaRunnerDownloadInfo(string releaseJson, string url)
+        {
+            var fileName = Path.GetFileName(new Uri(url).LocalPath);
+            var body = DownloadVerification.ExtractJsonStringValue(releaseJson, "body");
+            var sha256 = DownloadVerification.TryExtractSha256FromBody(body, fileName);
+
+            if (string.IsNullOrEmpty(sha256))
+            {
+                DebugLogger.LogWarning($"Could not find SHA256 hash for {fileName} in GitHub release data", COMPONENT);
+            }
+
+            return new BudaRunnerDownloadInfo
+            {
+                DownloadUrl = url,
+                Sha256 = sha256,
+                FileName = fileName
+            };
+        }
+
 
         /// <summary>
         /// Installs WSL image from downloaded archive
