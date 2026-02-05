@@ -680,8 +680,7 @@ namespace boinc_buda_runner_wsl_installer
         private static BudaRunnerDownloadInfo BuildBudaRunnerDownloadInfo(string releaseJson, string url)
         {
             var fileName = Path.GetFileName(new Uri(url).LocalPath);
-            var body = DownloadVerification.ExtractJsonStringValue(releaseJson, "body");
-            var sha256 = DownloadVerification.TryExtractSha256FromBody(body, fileName);
+            var sha256 = DownloadVerification.TryGetSha256FromReleaseJson(releaseJson, url);
 
             if (string.IsNullOrEmpty(sha256))
             {
