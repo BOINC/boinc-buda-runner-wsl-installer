@@ -15,6 +15,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with BOINC.  If not, see <http://www.gnu.org/licenses/>.
 
+using System;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
@@ -24,38 +25,29 @@ namespace boinc_buda_runner_wsl_installer
 {
     internal static class DownloadVerification
     {
-        public static string ExtractJsonStringValue(string json, string propertyName)
+        public static string TryGetSha256FromReleaseJson(string releaseJson, string downloadUrl)
         {
-            if (string.IsNullOrEmpty(json) || string.IsNullOrEmpty(propertyName)) return null;
-            var pattern = $"\"{Regex.Escape(propertyName)}\"\\s*:\\s*\"((?:\\\\.|[^\"])*)\"";
-            var match = Regex.Match(json, pattern, RegexOptions.IgnoreCase | RegexOptions.Singleline);
-            if (!match.Success) return null;
+            if (string.IsNullOrEmpty(releaseJson) || string.IsNullOrEmpty(downloadUrl)) return null;
 
-            var value = match.Groups[1].Value;
-            return UnescapeJsonString(value);
-        }
+            var urlPattern = Regex.Escape(downloadUrl);
+            var digestPatternAfter = $"\"browser_download_url\"\\s*:\\s*\"{urlPattern}\"(?:(?!\"browser_download_url\").)*?\"digest\"\\s*:\\s*\"([^\"]+)\"";
+            var digestPatternBefore = $"\"digest\"\\s*:\\s*\"([^\"]+)\"(?:(?!\"browser_download_url\").)*?\"browser_download_url\"\\s*:\\s*\"{urlPattern}\"";
 
-        public static string TryExtractSha256FromBody(string releaseBody, string fileName)
-        {
-            if (string.IsNullOrEmpty(releaseBody) || string.IsNullOrEmpty(fileName)) return null;
-
-            var patterns = new[]
+            var digestMatch = Regex.Match(releaseJson, digestPatternAfter, RegexOptions.IgnoreCase | RegexOptions.Singleline);
+            if (!digestMatch.Success)
             {
-                $@"(?im)^(?<hash>[a-f0-9]{{64}})\s+\*?{Regex.Escape(fileName)}\s*$",
-                $@"(?im)^{Regex.Escape(fileName)}\s*[:=]\s*(?<hash>[a-f0-9]{{64}})\s*$",
-                $@"(?im)^SHA256\s*\(\s*{Regex.Escape(fileName)}\s*\)\s*=\s*(?<hash>[a-f0-9]{{64}})\s*$"
-            };
-
-            foreach (var pattern in patterns)
-            {
-                var match = Regex.Match(releaseBody, pattern, RegexOptions.IgnoreCase | RegexOptions.Multiline);
-                if (match.Success)
-                {
-                    return match.Groups["hash"].Value;
-                }
+                digestMatch = Regex.Match(releaseJson, digestPatternBefore, RegexOptions.IgnoreCase | RegexOptions.Singleline);
             }
 
-            return null;
+            if (!digestMatch.Success) return null;
+
+            var digest = digestMatch.Groups[1].Value;
+            if (digest.StartsWith("sha256:", StringComparison.OrdinalIgnoreCase))
+            {
+                digest = digest.Substring("sha256:".Length);
+            }
+
+            return digest;
         }
 
         public static string ComputeSha256(string filePath)
@@ -78,15 +70,5 @@ namespace boinc_buda_runner_wsl_installer
             return string.IsNullOrWhiteSpace(hash) ? null : Regex.Replace(hash.Trim(), @"\s+", string.Empty).ToLowerInvariant();
         }
 
-        private static string UnescapeJsonString(string value)
-        {
-            if (string.IsNullOrEmpty(value)) return value;
-            return value
-                .Replace("\\r", "\r")
-                .Replace("\\n", "\n")
-                .Replace("\\\"", "\"")
-                .Replace("\\/", "/")
-                .Replace("\\\\", "\\");
-        }
     }
 }
