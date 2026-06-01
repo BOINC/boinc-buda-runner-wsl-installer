@@ -835,7 +835,7 @@ namespace boinc_buda_runner_wsl_installer
                 if (confirmResult != MessageBoxResult.Yes)
                 {
                     DebugLogger.LogInfo("User cancelled uninstallation", "MainWindow");
-                    ChangeRowIconAndStatus(ID.BoincProcessCheck, "GreyMinusIcon", "Uninstallation cancelled");
+                    ChangeRowIconAndStatus(ID.BudaRunnerCheck, "GreyMinusIcon", "Uninstallation cancelled");
                     return;
                 }
 
