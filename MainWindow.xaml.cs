@@ -843,8 +843,8 @@ namespace boinc_buda_runner_wsl_installer
                 ChangeRowIconAndStatus(ID.BudaRunnerCheck, "BlueInfoIcon", "Checking BOINC WSL Distro installation...");
                 await Task.Delay(100);
 
-                var budaCheckResult = await BudaRunnerCheck.CheckBudaRunnerAsync();
-                if (budaCheckResult.Status == BudaRunnerCheck.BudaRunnerStatus.NotInstalled)
+                bool isInstalled = await BudaRunnerCheck.IsWslImageInstalledAsync(BudaRunnerCheck.BUDA_RUNNER_IMAGE_NAME);
+                if (!isInstalled)
                 {
                     DebugLogger.LogInfo("BOINC WSL Distro is not installed", "MainWindow");
                     ChangeRowIconAndStatus(ID.BudaRunnerCheck, "GreyMinusIcon", "BOINC WSL Distro is not installed");
@@ -864,7 +864,7 @@ namespace boinc_buda_runner_wsl_installer
                 ChangeRowIconAndStatus(ID.BudaRunnerCheck, "BlueInfoIcon", "Removing BOINC WSL Distro...");
                 await Task.Delay(100);
 
-                bool removed = await BudaRunnerCheck.RemoveWslImageAsync("boinc-buda-runner");
+                bool removed = await BudaRunnerCheck.RemoveWslImageAsync(BudaRunnerCheck.BUDA_RUNNER_IMAGE_NAME);
                 if (!removed)
                 {
                     DebugLogger.LogError("Failed to remove BOINC WSL Distro", "MainWindow");

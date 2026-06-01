@@ -67,7 +67,7 @@ namespace boinc_buda_runner_wsl_installer
             public string FileName { get; set; }
         }
 
-        private const string BUDA_RUNNER_IMAGE_NAME = "boinc-buda-runner";
+        public const string BUDA_RUNNER_IMAGE_NAME = "boinc-buda-runner";
         private const string GITHUB_RELEASES_URL = "https://api.github.com/repos/BOINC/boinc-buda-runner-wsl/releases/latest";
 
         /// <summary>
@@ -264,7 +264,7 @@ namespace boinc_buda_runner_wsl_installer
         /// <summary>
         /// Checks if WSL image is installed
         /// </summary>
-        private static async Task<bool> IsWslImageInstalledAsync(string imageName)
+        public static async Task<bool> IsWslImageInstalledAsync(string imageName)
         {
             DebugLogger.LogMethodStart("IsWslImageInstalledAsync", $"imageName: {imageName}", COMPONENT);
 
