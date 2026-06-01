@@ -745,7 +745,7 @@ namespace boinc_buda_runner_wsl_installer
         /// <summary>
         /// Removes WSL image
         /// </summary>
-        private static async Task<bool> RemoveWslImageAsync(string imageName)
+        public static async Task<bool> RemoveWslImageAsync(string imageName)
         {
             DebugLogger.LogMethodStart("RemoveWslImageAsync", $"imageName: {imageName}", COMPONENT);
 
