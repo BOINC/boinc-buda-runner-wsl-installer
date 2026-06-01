@@ -34,6 +34,7 @@ namespace boinc_buda_runner_wsl_installer
     {
         public ObservableCollection<TableRow> TableItems { get; set; }
         private bool _isInstalling = false; // track if installation is in progress
+        private bool _isUninstalling = false; // track if uninstallation is in progress
         internal bool LastWindowsFeaturesRestartRequired { get; private set; } // quiet-mode detail
 
         public MainWindow()
@@ -87,15 +88,16 @@ namespace boinc_buda_runner_wsl_installer
         {
             DebugLogger.LogMethodStart("OnClosing", component: "MainWindow");
 
-            if (_isInstalling)
+            if (_isInstalling || _isUninstalling)
             {
+                var operationType = _isInstalling ? "Installation" : "Uninstallation";
                 var result = MessageBox.Show(
-                    "Installation is currently in progress. Are you sure you want to exit?",
+                    $"{operationType} is currently in progress. Are you sure you want to exit?",
                     "Confirm Exit",
                     MessageBoxButton.YesNo,
                     MessageBoxImage.Warning);
 
-                DebugLogger.LogInfo($"Installation in progress exit confirmation dialog result: {result}", "MainWindow");
+                DebugLogger.LogInfo($"{operationType} in progress exit confirmation dialog result: {result}", "MainWindow");
                 if (result != MessageBoxResult.Yes)
                 {
                     e.Cancel = true;
@@ -635,6 +637,13 @@ namespace boinc_buda_runner_wsl_installer
                 DebugLogger.LogInfo("Install button disabled during execution", "MainWindow");
             }
 
+            // Disable Uninstall button during installation
+            if (UninstallButton != null)
+            {
+                UninstallButton.IsEnabled = false;
+                DebugLogger.LogInfo("Uninstall button disabled during installation", "MainWindow");
+            }
+
             bool success = false; // track overall result
             _isInstalling = true; // mark installation started
 
@@ -730,6 +739,14 @@ namespace boinc_buda_runner_wsl_installer
                         DebugLogger.LogInfo("Install succeeded; button remains disabled", "MainWindow");
                     }
                 }
+
+                // Re-enable Uninstall button after installation
+                if (UninstallButton != null)
+                {
+                    UninstallButton.IsEnabled = true;
+                    DebugLogger.LogInfo("Uninstall button re-enabled after installation", "MainWindow");
+                }
+
                 DebugLogger.LogSeparator("Installation Process Completed");
             }
 
@@ -744,6 +761,165 @@ namespace boinc_buda_runner_wsl_installer
             this.Close();
 
             DebugLogger.LogMethodEnd("ExitButton_Click", component: "MainWindow");
+        }
+
+        private async void UninstallButton_Click(object sender, RoutedEventArgs e)
+        {
+            DebugLogger.LogSeparator("Uninstallation Process Started");
+            DebugLogger.LogMethodStart("UninstallButton_Click", component: "MainWindow");
+
+            if (IntroTextBlock != null && IntroTextBlock.Visibility == Visibility.Visible)
+            {
+                IntroTextBlock.Visibility = Visibility.Collapsed;
+            }
+
+            var uninstallButton = sender as Button;
+            if (uninstallButton != null)
+            {
+                uninstallButton.IsEnabled = false;
+                DebugLogger.LogInfo("Uninstall button disabled during execution", "MainWindow");
+            }
+
+            // Disable Install button during uninstallation
+            if (InstallButton != null)
+            {
+                InstallButton.IsEnabled = false;
+                DebugLogger.LogInfo("Install button disabled during uninstallation", "MainWindow");
+            }
+
+            _isUninstalling = true;
+
+            try
+            {
+                // Step 1: Check for running BOINC process
+                ChangeRowIconAndStatus(ID.BoincProcessCheck, "BlueInfoIcon", "Checking BOINC process...");
+                await Task.Delay(100);
+
+                var boincCheckResult = await BoincProcessCheck.CheckBoincProcessAsync();
+                if (boincCheckResult.Status == BoincProcessCheck.BoincProcessStatus.Running)
+                {
+                    DebugLogger.LogWarning("BOINC process is running, cannot proceed with uninstallation", "MainWindow");
+                    ChangeRowIconAndStatus(ID.BoincProcessCheck, "RedCancelIcon", $"{boincCheckResult.Message}");
+
+                    MessageBox.Show(
+                        "BOINC is currently running. Please close BOINC before uninstalling the BOINC WSL Distro.\n\n" +
+                        "To close BOINC:\n" +
+                        "1. Right-click the BOINC icon in the system tray\n" +
+                        "2. Select 'Exit BOINC'\n" +
+                        "3. Run this uninstaller again",
+                        "BOINC is Running",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    return;
+                }
+
+                ChangeRowIconAndStatus(ID.BoincProcessCheck, "GreenCheckboxIcon", "BOINC is not running");
+                DebugLogger.LogInfo("BOINC process check passed, not running", "MainWindow");
+
+                // Step 2: Confirm with user
+                var confirmResult = MessageBox.Show(
+                    "Are you sure you want to uninstall BOINC WSL Distro?\n\n" +
+                    "⚠️ WARNING:\n" +
+                    "• This will remove the BOINC WSL Distro from your system\n" +
+                    "• Any Docker-based BOINC tasks will fail after removal\n" +
+                    "• WSL itself will NOT be removed\n\n" +
+                    "To remove WSL completely, please refer to next documentation:\n" +
+                    "https://gist.github.com/4wk-/889b26043f519259ab60386ca13ba91b\n\n" +
+                    "Do you want to continue with uninstallation?",
+                    "Confirm Uninstallation",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Warning);
+
+                DebugLogger.LogInfo($"User confirmation result: {confirmResult}", "MainWindow");
+
+                if (confirmResult != MessageBoxResult.Yes)
+                {
+                    DebugLogger.LogInfo("User cancelled uninstallation", "MainWindow");
+                    ChangeRowIconAndStatus(ID.BudaRunnerCheck, "GreyMinusIcon", "Uninstallation cancelled");
+                    return;
+                }
+
+                // Step 3: Check if BOINC WSL Distro is installed
+                ChangeRowIconAndStatus(ID.BudaRunnerCheck, "BlueInfoIcon", "Checking BOINC WSL Distro installation...");
+                await Task.Delay(100);
+
+                bool isInstalled = await BudaRunnerCheck.IsWslImageInstalledAsync(BudaRunnerCheck.BUDA_RUNNER_IMAGE_NAME);
+                if (!isInstalled)
+                {
+                    DebugLogger.LogInfo("BOINC WSL Distro is not installed", "MainWindow");
+                    ChangeRowIconAndStatus(ID.BudaRunnerCheck, "GreyMinusIcon", "BOINC WSL Distro is not installed");
+
+                    MessageBox.Show(
+                        "BOINC WSL Distro is not installed on this system.",
+                        "Not Installed",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+                    return;
+                }
+
+                ChangeRowIconAndStatus(ID.BudaRunnerCheck, "GreenCheckboxIcon", "BOINC WSL Distro found");
+                DebugLogger.LogInfo("BOINC WSL Distro is installed, proceeding with removal", "MainWindow");
+
+                // Step 4: Remove BOINC WSL Distro
+                ChangeRowIconAndStatus(ID.BudaRunnerCheck, "BlueInfoIcon", "Removing BOINC WSL Distro...");
+                await Task.Delay(100);
+
+                bool removed = await BudaRunnerCheck.RemoveWslImageAsync(BudaRunnerCheck.BUDA_RUNNER_IMAGE_NAME);
+                if (!removed)
+                {
+                    DebugLogger.LogError("Failed to remove BOINC WSL Distro", "MainWindow");
+                    ChangeRowIconAndStatus(ID.BudaRunnerCheck, "RedCancelIcon", "Failed to remove BOINC WSL Distro");
+
+                    MessageBox.Show(
+                        "Failed to remove BOINC WSL Distro.\n\nPlease check the log file for details.",
+                        "Uninstallation Failed",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Error);
+                    return;
+                }
+
+                ChangeRowIconAndStatus(ID.BudaRunnerCheck, "GreenCheckboxIcon", "BOINC WSL Distro removed successfully");
+                DebugLogger.LogInfo("BOINC WSL Distro removed successfully", "MainWindow");
+
+                await Task.Delay(100);
+                MessageBox.Show(
+                    "BOINC WSL Distro has been successfully removed from your system.\n\n" +
+                    "Note: WSL itself remains installed. To remove WSL completely, please refer to:\n" +
+                    "https://gist.github.com/4wk-/889b26043f519259ab60386ca13ba91b",
+                    "Uninstallation Complete",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.LogException(ex, "Unexpected error during uninstallation", "MainWindow");
+                MessageBox.Show(
+                    $"An unexpected error occurred during uninstallation:\n\n{ex.Message}\n\nPlease check the log file for details.",
+                    "Uninstallation Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+            finally
+            {
+                _isUninstalling = false;
+
+                if (uninstallButton != null)
+                {
+                    uninstallButton.IsEnabled = true;
+                    DebugLogger.LogInfo("Uninstall button re-enabled", "MainWindow");
+                }
+
+                // Re-enable Install button after uninstallation
+                if (InstallButton != null)
+                {
+                    InstallButton.IsEnabled = true;
+                    DebugLogger.LogInfo("Install button re-enabled after uninstallation", "MainWindow");
+                }
+
+                DebugLogger.LogSeparator("Uninstallation Process Completed");
+            }
+
+            DebugLogger.LogMethodEnd("UninstallButton_Click", component: "MainWindow");
         }
 
         internal void ChangeRowIconAndStatus(ID id, string newIcon, string status)
