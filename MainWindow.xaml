@@ -31,7 +31,7 @@ along with BOINC.  If not, see <http://www.gnu.org/licenses/>.
     </Window.Resources>
     <Grid>
         <!-- Background images layer -->
-        <Grid x:Name="BackgroundImagesGrid" Panel.ZIndex="-1">
+        <Grid x:Name="BackgroundImagesGrid" Panel.ZIndex="-1" IsHitTestVisible="False">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="*"/>
