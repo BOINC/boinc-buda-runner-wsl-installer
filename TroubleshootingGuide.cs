@@ -127,15 +127,16 @@ namespace boinc_buda_runner_wsl_installer
                 Steps = new List<string>
                 {
                     "The installer will automatically enable the required Windows features",
-                    "If a restart is required, you will be prompted",
+                    "A restart might be required, even if you are not prompted to restart",
                     "After restarting, run this installer again to continue",
                     "",
                     "If automatic enablement fails, you can enable features manually:",
                     "1. Open 'Turn Windows features on or off' (search in Start menu)",
                     "2. Enable 'Virtual Machine Platform'",
                     "3. Enable 'Windows Subsystem for Linux'",
-                    "4. Click OK and restart your computer when prompted",
-                    "5. Run this installer again after restart"
+                    "4. Click OK",
+                    "5. Restart your computer",
+                    "6. Run this installer again after restart"
                 },
                 AdditionalResources = new List<string>
                 {
@@ -301,8 +302,9 @@ namespace boinc_buda_runner_wsl_installer
                     "1. Open 'Turn Windows features on or off'",
                     "2. Verify 'Virtual Machine Platform' is checked",
                     "3. Verify 'Windows Subsystem for Linux' is checked",
-                    "4. If not, enable them and restart",
-                    "5. Run this installer again"
+                    "4. If any were unchecked, check them and click OK",
+                    "5. If any were enabled recently, restart your computer",
+                    "6. Run this installer again"
                 },
                 AdditionalResources = new List<string>
                 {
