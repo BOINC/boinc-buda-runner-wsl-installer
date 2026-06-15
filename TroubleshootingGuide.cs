@@ -302,8 +302,9 @@ namespace boinc_buda_runner_wsl_installer
                     "1. Open 'Turn Windows features on or off'",
                     "2. Verify 'Virtual Machine Platform' is checked",
                     "3. Verify 'Windows Subsystem for Linux' is checked",
-                    "4. If Windows features were enabled recently, restart your computer",
-                    "5. Run this installer again"
+                    "4. If any were unchecked, check them and click OK",
+                    "5. If any were enabled recently, restart your computer",
+                    "6. Run this installer again"
                 },
                 AdditionalResources = new List<string>
                 {
