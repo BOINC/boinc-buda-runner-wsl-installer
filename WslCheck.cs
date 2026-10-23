@@ -35,7 +35,6 @@ namespace boinc_buda_runner_wsl_installer
             NotInstalled,
             OutdatedVersion,
             CorrectVersion,
-            WrongDefaultVersion,
             AllGood,
             Error
         }
@@ -45,22 +44,15 @@ namespace boinc_buda_runner_wsl_installer
             public string WslVersion { get; set; }
         }
 
-        public class WslStatusInfo
-        {
-            public int DefaultVersion { get; set; }
-        }
-
         public class WslCheckResult
         {
             public WslStatus Status { get; set; }
             public string Message { get; set; }
             public WslVersionInfo VersionInfo { get; set; }
-            public WslStatusInfo StatusInfo { get; set; }
             public string LatestVersion { get; set; }
             public string DownloadUrl { get; set; }
             public string DownloadSha256 { get; set; }
             public bool UpdateRequired { get; set; }
-            public bool VersionChangeRequired { get; set; }
         }
 
         public class WslDownloadInfo
@@ -94,20 +86,8 @@ namespace boinc_buda_runner_wsl_installer
 
                 DebugLogger.LogConfiguration("WSL Version", result.VersionInfo.WslVersion ?? "Unknown", COMPONENT);
 
-                // Step 2: Check WSL status (default distribution and version)
-                DebugLogger.LogInfo("Step 2: Checking WSL status (default distribution and version)", COMPONENT);
-                result.StatusInfo = await GetWslStatusAsync();
-                if (result.StatusInfo != null)
-                {
-                    DebugLogger.LogConfiguration("Default Version", result.StatusInfo.DefaultVersion, COMPONENT);
-                }
-                else
-                {
-                    DebugLogger.LogWarning("Could not get WSL status information", COMPONENT);
-                }
-
-                // Step 3: Get latest version from GitHub
-                DebugLogger.LogInfo("Step 3: Getting latest version from GitHub", COMPONENT);
+                // Step 2: Get latest version from GitHub
+                DebugLogger.LogInfo("Step 2: Getting latest version from GitHub", COMPONENT);
                 result.LatestVersion = await GetLatestWslVersionFromGitHubAsync();
                 var downloadInfo = await GetLatestWslDownloadInfoAsync();
                 result.DownloadUrl = downloadInfo?.DownloadUrl;
@@ -116,26 +96,18 @@ namespace boinc_buda_runner_wsl_installer
                 DebugLogger.LogConfiguration("Download URL", result.DownloadUrl, COMPONENT);
                 DebugLogger.LogConfiguration("Download SHA256", result.DownloadSha256 ?? "null", COMPONENT);
 
-                // Step 4: Compare versions and determine status
-                DebugLogger.LogInfo("Step 4: Comparing versions and determining requirements", COMPONENT);
+                // Step 3: Compare versions and determine status
+                DebugLogger.LogInfo("Step 3: Comparing versions and determining requirements", COMPONENT);
                 result.UpdateRequired = IsUpdateRequired(result.VersionInfo.WslVersion, result.LatestVersion);
-                result.VersionChangeRequired = result.StatusInfo?.DefaultVersion != 2;
                 DebugLogger.LogConfiguration("Update Required", result.UpdateRequired, COMPONENT);
-                DebugLogger.LogConfiguration("Version Change Required", result.VersionChangeRequired, COMPONENT);
 
-                // Step 5: Determine overall status
-                DebugLogger.LogInfo("Step 5: Determining overall status", COMPONENT);
+                // Step 4: Determine overall status
+                DebugLogger.LogInfo("Step 4: Determining overall status", COMPONENT);
                 if (result.UpdateRequired)
                 {
                     result.Status = WslStatus.OutdatedVersion;
                     result.Message = $"WSL version {result.VersionInfo.WslVersion} is outdated. Latest version is {result.LatestVersion}";
                     DebugLogger.LogInfo($"WSL is outdated: {result.VersionInfo.WslVersion} -> {result.LatestVersion}", COMPONENT);
-                }
-                else if (result.VersionChangeRequired)
-                {
-                    result.Status = WslStatus.WrongDefaultVersion;
-                    result.Message = $"WSL default version is {result.StatusInfo.DefaultVersion}, but should be 2";
-                    DebugLogger.LogInfo($"WSL default version needs change: {result.StatusInfo.DefaultVersion} -> 2", COMPONENT);
                 }
                 else
                 {
@@ -214,61 +186,6 @@ namespace boinc_buda_runner_wsl_installer
         }
 
         /// <summary>
-        /// Gets WSL status information by executing 'wsl --status'
-        /// </summary>
-        public static async Task<WslStatusInfo> GetWslStatusAsync()
-        {
-            DebugLogger.LogMethodStart("GetWslStatusAsync", component: COMPONENT);
-
-            try
-            {
-                var startInfo = new ProcessStartInfo
-                {
-                    FileName = "wsl.exe",
-                    Arguments = "--status",
-                    UseShellExecute = false,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    CreateNoWindow = true,
-                    WindowStyle = ProcessWindowStyle.Hidden,
-                    StandardOutputEncoding = Encoding.Unicode,
-                    StandardErrorEncoding = Encoding.Unicode
-                };
-
-                using (var process = new Process { StartInfo = startInfo })
-                {
-                    process.Start();
-
-                    var output = await process.StandardOutput.ReadToEndAsync();
-                    var error = await process.StandardError.ReadToEndAsync();
-
-                    await Task.Run(() => process.WaitForExit(10000)); // 10 second timeout
-
-                    DebugLogger.LogProcessExecution("wsl.exe", "--status", process.ExitCode, output, error, COMPONENT);
-
-                    if (process.ExitCode == 0 && !string.IsNullOrEmpty(output))
-                    {
-                        var statusInfo = ParseWslStatusOutput(output);
-                        DebugLogger.LogMethodEnd("GetWslStatusAsync", $"Success: DefaultVersion={statusInfo.DefaultVersion}", COMPONENT);
-                        return statusInfo;
-                    }
-                    else
-                    {
-                        DebugLogger.LogWarning("WSL status command failed or returned empty output", COMPONENT);
-                        DebugLogger.LogMethodEnd("GetWslStatusAsync", "null (failed)", COMPONENT);
-                        return null;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                DebugLogger.LogException(ex, "Error getting WSL status", COMPONENT);
-                DebugLogger.LogMethodEnd("GetWslStatusAsync", "null (exception)", COMPONENT);
-                return null;
-            }
-        }
-
-        /// <summary>
         /// Gets the latest WSL version from GitHub releases API using simple string parsing
         /// </summary>
         public static async Task<string> GetLatestWslVersionFromGitHubAsync()
@@ -306,15 +223,6 @@ namespace boinc_buda_runner_wsl_installer
 
             DebugLogger.LogMethodEnd("GetLatestWslVersionFromGitHubAsync", "Unknown", COMPONENT);
             return "Unknown";
-        }
-
-        /// <summary>
-        /// Gets the download URL for the latest WSL installer based on OS architecture
-        /// </summary>
-        public static async Task<string> GetLatestWslDownloadUrlAsync()
-        {
-            var info = await GetLatestWslDownloadInfoAsync();
-            return info?.DownloadUrl;
         }
 
         /// <summary>
@@ -736,7 +644,7 @@ namespace boinc_buda_runner_wsl_installer
         /// </summary>
         public static async Task<bool> FixWslIssuesAsync(WslCheckResult checkResult, IProgress<string> progress = null)
         {
-            DebugLogger.LogMethodStart("FixWslIssuesAsync", $"UpdateRequired: {checkResult.UpdateRequired}, VersionChangeRequired: {checkResult.VersionChangeRequired}", COMPONENT);
+            DebugLogger.LogMethodStart("FixWslIssuesAsync", $"UpdateRequired: {checkResult.UpdateRequired}", COMPONENT);
 
             try
             {
@@ -757,23 +665,6 @@ namespace boinc_buda_runner_wsl_installer
                         return false;
                     }
                     DebugLogger.LogInfo("WSL update completed successfully", COMPONENT);
-                }
-
-                // Set default version to 2 if needed
-                if (checkResult.VersionChangeRequired)
-                {
-                    DebugLogger.LogInfo("Setting WSL default version to 2", COMPONENT);
-                    progress?.Report("Setting WSL default version to 2...");
-                    success = await SetDefaultWslVersionTo2Async();
-
-                    if (!success)
-                    {
-                        DebugLogger.LogError("Failed to set WSL default version to 2", COMPONENT);
-                        progress?.Report("Failed to set WSL default version to 2");
-                        DebugLogger.LogMethodEnd("FixWslIssuesAsync", "false (version change failed)", COMPONENT);
-                        return false;
-                    }
-                    DebugLogger.LogInfo("WSL default version set to 2 successfully", COMPONENT);
                 }
 
                 DebugLogger.LogInfo("WSL configuration completed successfully", COMPONENT);
@@ -815,32 +706,6 @@ namespace boinc_buda_runner_wsl_installer
             DebugLogger.LogConfiguration("Parsed WSL Version", versionInfo.WslVersion ?? "null", COMPONENT);
             DebugLogger.LogMethodEnd("ParseWslVersionOutput", $"WSL Version: {versionInfo.WslVersion}", COMPONENT);
             return versionInfo;
-        }
-
-        /// <summary>
-        /// Parses the output of 'wsl --status' command
-        /// </summary>
-        private static WslStatusInfo ParseWslStatusOutput(string output)
-        {
-            DebugLogger.LogMethodStart("ParseWslStatusOutput", $"output length: {output?.Length ?? 0}", COMPONENT);
-            var statusInfo = new WslStatusInfo();
-
-            var lines = output.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
-            DebugLogger.LogConfiguration("Status Output Lines Count", lines.Length, COMPONENT);
-
-            foreach (var line in lines)
-            {
-                DebugLogger.LogDebug($"Parsing status line: {line}", COMPONENT);
-
-                var versionStr = ExtractVersionValue(line);
-                if (int.TryParse(versionStr, out var version))
-                    if (version == 1 || version == 2)
-                        statusInfo.DefaultVersion = version;
-            }
-
-            DebugLogger.LogConfiguration("Parsed Default Version", statusInfo.DefaultVersion, COMPONENT);
-            DebugLogger.LogMethodEnd("ParseWslStatusOutput", $"DefaultVersion: {statusInfo.DefaultVersion}", COMPONENT);
-            return statusInfo;
         }
 
         /// <summary>
@@ -932,9 +797,6 @@ namespace boinc_buda_runner_wsl_installer
                     break;
                 case WslStatus.OutdatedVersion:
                     message = $"WSL needs update (current: {result.VersionInfo?.WslVersion}, latest: {result.LatestVersion})";
-                    break;
-                case WslStatus.WrongDefaultVersion:
-                    message = $"WSL default version is {result.StatusInfo?.DefaultVersion}, should be 2";
                     break;
                 case WslStatus.AllGood:
                     message = $"WSL {result.VersionInfo?.WslVersion} is up to date and properly configured";
