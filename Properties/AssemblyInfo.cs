@@ -17,19 +17,18 @@
 
 using System.Reflection;
 using System.Resources;
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Windows;
 
 // General Information about an assembly is controlled through the following
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
-[assembly: AssemblyTitle("BOINC BUDA Runner WSL Installer")]
+[assembly: AssemblyTitle("BOINC Linux Applications Support Installer")]
 [assembly: AssemblyDescription("")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("University of California")]
-[assembly: AssemblyProduct("BOINC BUDA Runner WSL Installer")]
-[assembly: AssemblyCopyright("Copyright © 2025 University of California")]
+[assembly: AssemblyProduct("BOINC Linux Applications Support Installer")]
+[assembly: AssemblyCopyright("Copyright © 2026 University of California")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 

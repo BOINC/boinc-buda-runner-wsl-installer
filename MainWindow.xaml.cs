@@ -33,16 +33,23 @@ namespace boinc_buda_runner_wsl_installer
     public partial class MainWindow : Window
     {
         public ObservableCollection<TableRow> TableItems { get; set; }
+        public bool NoUninstall { get; set; }
         private bool _isInstalling = false; // track if installation is in progress
         private bool _isUninstalling = false; // track if uninstallation is in progress
         internal bool LastWindowsFeaturesRestartRequired { get; private set; } // quiet-mode detail
 
-        public MainWindow()
+        public MainWindow() : this(false)
         {
+        }
+
+        public MainWindow(bool noUninstall)
+        {
+            NoUninstall = noUninstall;
             InitializeComponent();
 
             // Enable debug logging by default
             DebugLogger.IsEnabled = true;
+            UninstallButton.IsEnabled = !NoUninstall;
 
             TableItems = new ObservableCollection<TableRow>
             {
@@ -271,7 +278,6 @@ namespace boinc_buda_runner_wsl_installer
                         return installResult;
 
                     case WslCheck.WslStatus.OutdatedVersion:
-                    case WslCheck.WslStatus.WrongDefaultVersion:
                         DebugLogger.LogWarning($"WSL needs fixing: {wslResult.Status}", "MainWindow");
                         ChangeRowIconAndStatus(ID.WslCheck, "YellowExclamationIcon", WslCheck.GetStatusDisplayMessage(wslResult));
                         var fixResult = await FixWslIssues(wslResult);
@@ -286,8 +292,7 @@ namespace boinc_buda_runner_wsl_installer
                         PromptOpenIssue("WSL check error", 
                             $"WSL Status: {wslResult.Status}\n" +
                             $"Message: {wslResult.Message}\n" +
-                            $"Version Info: {wslResult.VersionInfo?.WslVersion ?? "N/A"}\n" +
-                            $"Default Version: {wslResult.StatusInfo?.DefaultVersion.ToString() ?? "N/A"}");
+                            $"Version Info: {wslResult.VersionInfo?.WslVersion ?? "N/A"}\n");
                         return false;
                 }
             }
@@ -362,135 +367,6 @@ namespace boinc_buda_runner_wsl_installer
                 // Offer to report issue
                 PromptOpenIssue("BOINC process check exception", ex.ToString());
                 return true; // Continue despite error
-            }
-        }
-
-        internal async Task<bool> CheckBudaRunner()
-        {
-            DebugLogger.LogMethodStart("CheckBudaRunner", component: "MainWindow");
-
-            // Update UI to show we're checking BUDA Runner
-            ChangeRowIconAndStatus(ID.BudaRunnerCheck, "BlueInfoIcon", "Checking BOINC WSL Distro installation...");
-
-            // Allow UI to update
-            await Task.Delay(100);
-
-            try
-            {
-                // Perform comprehensive BUDA Runner check
-                var budaResult = await BudaRunnerCheck.CheckBudaRunnerAsync();
-                DebugLogger.LogInfo($"BUDA Runner check completed. Status: {budaResult.Status}", "MainWindow");
-                DebugLogger.LogConfiguration("BUDA Runner Installed", budaResult.VersionInfo.IsInstalled, "MainWindow");
-                DebugLogger.LogConfiguration("BUDA Runner Current Version", budaResult.VersionInfo.CurrentVersion ?? "N/A", "MainWindow");
-                DebugLogger.LogConfiguration("BUDA Runner Latest Version", budaResult.VersionInfo.LatestVersion ?? "N/A", "MainWindow");
-                DebugLogger.LogConfiguration("BUDA Runner Update Required", budaResult.UpdateRequired, "MainWindow");
-
-                switch (budaResult.Status)
-                {
-                    case BudaRunnerCheck.BudaRunnerStatus.InstalledUpToDate:
-                        DebugLogger.LogInfo("BUDA Runner is installed and up to date", "MainWindow");
-                        ChangeRowIconAndStatus(ID.BudaRunnerCheck, "GreenCheckboxIcon", BudaRunnerCheck.GetStatusDisplayMessage(budaResult));
-                        DebugLogger.LogMethodEnd("CheckBudaRunner", "true (up to date)", "MainWindow");
-                        return true;
-
-                    case BudaRunnerCheck.BudaRunnerStatus.NotInstalled:
-                        DebugLogger.LogInfo("BUDA Runner is not installed, attempting installation", "MainWindow");
-                        ChangeRowIconAndStatus(ID.BudaRunnerCheck, "YellowExclamationIcon", "BOINC WSL Distro is not installed");
-                        var installResult = await InstallBudaRunner(budaResult);
-                        DebugLogger.LogMethodEnd("CheckBudaRunner", $"{installResult} (install attempted)", "MainWindow");
-                        return installResult;
-
-                    case BudaRunnerCheck.BudaRunnerStatus.InstalledOutdated:
-                    case BudaRunnerCheck.BudaRunnerStatus.InstalledNoVersion:
-                        DebugLogger.LogInfo($"BUDA Runner needs update/reinstall: {budaResult.Status}", "MainWindow");
-                        ChangeRowIconAndStatus(ID.BudaRunnerCheck, "YellowExclamationIcon", BudaRunnerCheck.GetStatusDisplayMessage(budaResult));
-                        var updateResult = await InstallBudaRunner(budaResult);
-                        DebugLogger.LogMethodEnd("CheckBudaRunner", $"{updateResult} (update attempted)", "MainWindow");
-                        return updateResult;
-
-                    case BudaRunnerCheck.BudaRunnerStatus.Error:
-                    default:
-                        DebugLogger.LogError($"BUDA Runner check failed: {budaResult.ErrorMessage}", "MainWindow");
-                        ChangeRowIconAndStatus(ID.BudaRunnerCheck, "YellowExclamationIcon", BudaRunnerCheck.GetStatusDisplayMessage(budaResult));
-                        DebugLogger.LogMethodEnd("CheckBudaRunner", "true (error, continue anyway)", "MainWindow");
-                        // Offer to report issue
-                        PromptOpenIssue("BUDA Runner check error", 
-                            $"Status: {budaResult.Status}\n" +
-                            $"Error Message: {budaResult.ErrorMessage ?? "N/A"}\n" +
-                            $"Is Installed: {budaResult.VersionInfo.IsInstalled}\n" +
-                            $"Current Version: {budaResult.VersionInfo.CurrentVersion ?? "N/A"}\n" +
-                            $"Latest Version: {budaResult.VersionInfo.LatestVersion ?? "N/A"}\n" +
-                            $"Has Version File: {budaResult.VersionInfo.HasVersionFile}");
-                        return true; // Continue despite error
-                }
-            }
-            catch (System.Exception ex)
-            {
-                DebugLogger.LogException(ex, "Error occurred while checking BUDA Runner", "MainWindow");
-                ChangeRowIconAndStatus(ID.BudaRunnerCheck, "YellowExclamationIcon", "Error occurred while checking BOINC WSL Distro");
-                DebugLogger.LogMethodEnd("CheckBudaRunner", "true (exception, continue anyway)", "MainWindow");
-                // Offer to report issue
-                PromptOpenIssue("BUDA Runner check exception", 
-                    $"Exception Type: {ex.GetType().Name}\n" +
-                    $"Message: {ex.Message}\n" +
-                    $"Stack Trace:\n{ex.StackTrace}");
-                return true; // Continue despite error
-            }
-        }
-
-        private async Task<bool> InstallBudaRunner(BudaRunnerCheck.BudaRunnerCheckResult budaResult)
-        {
-            DebugLogger.LogMethodStart("InstallBudaRunner", $"Status: {budaResult.Status}", "MainWindow");
-
-            try
-            {
-                // Create a progress reporter for UI updates
-                var progress = new System.Progress<string>(message =>
-                {
-                    DebugLogger.LogInfo($"BUDA Runner install progress: {message}", "MainWindow");
-                    ChangeRowIconAndStatus(ID.BudaRunnerCheck, "BlueInfoIcon", message);
-                });
-
-                // Install or update BUDA Runner
-                bool success = await BudaRunnerCheck.InstallOrUpdateBudaRunnerAsync(budaResult, progress);
-
-                if (success)
-                {
-                    DebugLogger.LogInfo("BUDA Runner installation completed successfully", "MainWindow");
-                    ChangeRowIconAndStatus(ID.BudaRunnerCheck, "GreenCheckboxIcon", "BOINC WSL Distro installed and configured successfully");
-                    DebugLogger.LogMethodEnd("InstallBudaRunner", "true", "MainWindow");
-                    return true;
-                }
-                else
-                {
-                    DebugLogger.LogError("BUDA Runner installation failed", "MainWindow");
-                    ChangeRowIconAndStatus(ID.BudaRunnerCheck, "RedCancelIcon", "Failed to install BOINC WSL Distro");
-                    DebugLogger.LogMethodEnd("InstallBudaRunner", "false", "MainWindow");
-                    // Offer to report issue with detailed context
-                    PromptOpenIssue("BOINC WSL Distro installation failed", 
-                        $"Installation Status: Failed\n" +
-                        $"Was Previously Installed: {budaResult.VersionInfo.IsInstalled}\n" +
-                        $"Current Version: {budaResult.VersionInfo.CurrentVersion ?? "N/A"}\n" +
-                        $"Target Version: {budaResult.VersionInfo.LatestVersion ?? "N/A"}\n" +
-                        $"Download URL: {budaResult.DownloadUrl ?? "N/A"}\n" +
-                        $"Update Required: {budaResult.UpdateRequired}\n" +
-                        $"Check the log file for detailed error information.");
-                    return false;
-                }
-            }
-            catch (System.Exception ex)
-            {
-                DebugLogger.LogException(ex, "BUDA Runner installation failed", "MainWindow");
-                ChangeRowIconAndStatus(ID.BudaRunnerCheck, "RedCancelIcon", $"BOINC WSL Distro installation failed: {ex.Message}");
-                DebugLogger.LogMethodEnd("InstallBudaRunner", "false (exception)", "MainWindow");
-                // Offer to report issue
-                PromptOpenIssue("BOINC WSL Distro installation exception", 
-                    $"Exception Type: {ex.GetType().Name}\n" +
-                    $"Message: {ex.Message}\n" +
-                    $"Was Previously Installed: {budaResult.VersionInfo.IsInstalled}\n" +
-                    $"Target Version: {budaResult.VersionInfo.LatestVersion ?? "N/A"}\n" +
-                    $"Stack Trace:\n{ex.StackTrace}");
-                return false;
             }
         }
 
@@ -591,9 +467,7 @@ namespace boinc_buda_runner_wsl_installer
                         $"WSL Status: {wslResult.Status}\n" +
                         $"Current Version: {wslResult.VersionInfo?.WslVersion ?? "N/A"}\n" +
                         $"Latest Version: {wslResult.LatestVersion ?? "N/A"}\n" +
-                        $"Default Version: {wslResult.StatusInfo?.DefaultVersion.ToString() ?? "N/A"}\n" +
                         $"Update Required: {wslResult.UpdateRequired}\n" +
-                        $"Version Change Required: {wslResult.VersionChangeRequired}\n" +
                         $"Message: {wslResult.Message}");
                     return false;
                 }
@@ -696,13 +570,6 @@ namespace boinc_buda_runner_wsl_installer
                 if (!res)
                 {
                     DebugLogger.LogError("WSL check/installation failed", "MainWindow");
-                    return; // failure
-                }
-
-                res = await CheckBudaRunner();
-                if (!res)
-                {
-                    DebugLogger.LogError("BOINC WSL Distro check/installation failed", "MainWindow");
                     return; // failure
                 }
 

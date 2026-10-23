@@ -23,9 +23,9 @@ along with BOINC.  If not, see <http://www.gnu.org/licenses/>.
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:boinc_buda_runner_wsl_installer"
         mc:Ignorable="d"
-        Title="BOINC WSL Distro Installer - Version 2.3.2"
+        Title="BOINC Linux applications support Installer - Version 2.3.2"
         Height="450"
-        Width="800">
+        Width="600">
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
     </Window.Resources>
@@ -63,7 +63,7 @@ along with BOINC.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Intro text shown before installation starts -->
             <TextBlock x:Name="IntroTextBlock"
                    Grid.Row="0"
-                   Text="This will install the BOINC WSL Distro, allowing BOINC to run jobs based on Docker.&#x0a;Click Install to continue."
+                   Text="This will install the BOINC Linux applications support, allowing BOINC to run Linux jobs based on Docker.&#x0a;Click Install to continue."
                    TextAlignment="Center"
                    VerticalAlignment="Center"
                    HorizontalAlignment="Center"
@@ -131,7 +131,7 @@ along with BOINC.  If not, see <http://www.gnu.org/licenses/>.
                 <StackPanel Grid.Column="1" Orientation="Horizontal">
                     <Button Name="InstallButton" Content="Install" Width="80" Height="30" Margin="5" Click="InstallButton_Click"/>
                     <Button Name="UninstallButton" Content="Uninstall" Width="80" Height="30" Margin="5" Click="UninstallButton_Click"/>
-                    <Button Name="ExitButton" Content="Exit" Width="80" Height="30" Margin="5" Click="ExitButton_Click"/>
+                    <Button Name="ExitButton" Content="Finish" Width="80" Height="30" Margin="5" Click="ExitButton_Click"/>
                 </StackPanel>
             </Grid>
         </Grid>

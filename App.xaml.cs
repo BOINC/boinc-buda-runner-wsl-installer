@@ -46,6 +46,7 @@ namespace boinc_buda_runner_wsl_installer
             var args = e.Args ?? new string[0];
             var hasQuiet = args.Any(a => string.Equals(a, "--quiet", StringComparison.OrdinalIgnoreCase) || string.Equals(a, "-q", StringComparison.OrdinalIgnoreCase));
             var hasVeryQuiet = args.Any(a => string.Equals(a, "-qq", StringComparison.OrdinalIgnoreCase));
+            var hasNoUninstall = args.Any(a => string.Equals(a, "-nu", StringComparison.OrdinalIgnoreCase));
             IsQuiet = hasQuiet || hasVeryQuiet;
 
             if (hasQuiet || hasVeryQuiet)
@@ -66,7 +67,7 @@ namespace boinc_buda_runner_wsl_installer
             }
 
             // Normal (non-quiet) mode: show main window
-            var mainWindow = new MainWindow();
+            var mainWindow = new MainWindow(hasNoUninstall);
             mainWindow.Show();
         }
 
@@ -112,13 +113,6 @@ namespace boinc_buda_runner_wsl_installer
                 if (!wslOk)
                 {
                     return ErrWslCheckOrInstallFailed;
-                }
-
-                // 6) BUDA Runner check/install
-                var budaOk = await window.CheckBudaRunner();
-                if (!budaOk)
-                {
-                    return ErrBudaRunnerInstallFailed;
                 }
 
                 return ExitOk;

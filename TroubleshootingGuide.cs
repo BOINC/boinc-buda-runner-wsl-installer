@@ -1,6 +1,6 @@
 // This file is part of BOINC.
 // https://boinc.berkeley.edu
-// Copyright (C) 2025 University of California
+// Copyright (C) 2026 University of California
 //
 // BOINC is free software; you can redistribute it and/or modify it
 // under the terms of the GNU Lesser General Public License
@@ -36,8 +36,6 @@ namespace boinc_buda_runner_wsl_installer
             WslInstallationFailed,
             WslCheckFailed,
             BoincRunning,
-            BudaRunnerInstallFailed,
-            BudaRunnerVersionCheckFailed,
             NetworkError,
             PermissionError,
             UnknownError
@@ -76,12 +74,6 @@ namespace boinc_buda_runner_wsl_installer
 
                 case ErrorCategory.BoincRunning:
                     return GetBoincRunningAdvice();
-
-                case ErrorCategory.BudaRunnerInstallFailed:
-                    return GetBudaRunnerInstallFailedAdvice(errorDetails);
-
-                case ErrorCategory.BudaRunnerVersionCheckFailed:
-                    return GetBudaRunnerVersionCheckFailedAdvice();
 
                 case ErrorCategory.NetworkError:
                     return GetNetworkErrorAdvice();
@@ -365,109 +357,6 @@ namespace boinc_buda_runner_wsl_installer
             };
         }
 
-        private static TroubleshootingAdvice GetBudaRunnerInstallFailedAdvice(string errorDetails)
-        {
-            var advice = new TroubleshootingAdvice
-            {
-                Title = "BOINC WSL Distro Installation Failed",
-                Description = "The installation of the BOINC WSL Distro encountered an error. This could be due to network issues, insufficient disk space, or WSL configuration problems.",
-                Steps = new List<string>
-                {
-                    "Try these troubleshooting steps:",
-                    "",
-                    "Step 1: Verify Prerequisites",
-                    "1. Make sure WSL is properly installed (run: wsl --version)",
-                    "2. Verify you have at least 10 GB of free disk space",
-                    "3. Check your internet connection is stable",
-                    "",
-                    "Step 2: Manual Installation Attempt",
-                    "1. Download the latest release from:",
-                    "   https://github.com/BOINC/boinc-buda-runner-wsl/releases/latest",
-                    "2. Find the .wsl file matching your architecture (x64 or ARM64)",
-                    "3. Open PowerShell as Administrator",
-                    "4. Run: wsl --install --from-file \"path\\to\\downloaded.wsl\" --no-launch",
-                    "5. If successful, run this installer again to verify",
-                    "",
-                    "Step 3: Clean Up and Retry",
-                    "1. Open PowerShell as Administrator",
-                    "2. Run: wsl --list",
-                    "3. If you see 'boinc-buda-runner', unregister it: wsl --unregister boinc-buda-runner",
-                    "4. Run this installer again",
-                    "",
-                    "Step 4: Check WSL Status",
-                    "1. Run: wsl --status",
-                    "2. Verify default version is 2",
-                    "3. If not, run: wsl --set-default-version 2",
-                    "4. Run this installer again"
-                },
-                AdditionalResources = new List<string>
-                {
-                    "BOINC WSL Distro Releases: https://github.com/BOINC/boinc-buda-runner-wsl/releases",
-                    "WSL Import Documentation: https://docs.microsoft.com/windows/wsl/use-custom-distro",
-                    "Create GitHub Issue: https://github.com/BOINC/boinc-buda-runner-wsl-installer/issues/new"
-                }
-            };
-
-            if (!string.IsNullOrEmpty(errorDetails))
-            {
-                if (errorDetails.Contains("0x80070070") || errorDetails.Contains("disk space"))
-                {
-                    advice.Steps.Insert(1, "Error indicates insufficient disk space. You need at least 10 GB free.");
-                    advice.Steps.Insert(2, "Free up disk space and try again.");
-                    advice.Steps.Insert(3, "");
-                }
-                else if (errorDetails.Contains("timeout") || errorDetails.Contains("timed out"))
-                {
-                    advice.Steps.Insert(1, "Installation timed out. This may be due to slow internet or system performance.");
-                    advice.Steps.Insert(2, "Try downloading the .wsl file manually and use Method 2 above.");
-                    advice.Steps.Insert(3, "");
-                }
-                else if (errorDetails.Contains("0x80070032"))
-                {
-                    advice.Steps.Insert(1, "Error indicates the distribution is already in use.");
-                    advice.Steps.Insert(2, "Close all WSL windows and try: wsl --shutdown");
-                    advice.Steps.Insert(3, "Then run this installer again.");
-                    advice.Steps.Insert(4, "");
-                }
-            }
-
-            return advice;
-        }
-
-        private static TroubleshootingAdvice GetBudaRunnerVersionCheckFailedAdvice()
-        {
-            return new TroubleshootingAdvice
-            {
-                Title = "Unable to Verify BOINC WSL Distro Version",
-                Description = "The installer cannot determine the version of the BOINC WSL Distro. This may indicate a corrupted installation or missing version file.",
-                Steps = new List<string>
-                {
-                    "Try these solutions:",
-                    "",
-                    "Solution 1: Reinstall BOINC WSL Distro",
-                    "1. Open PowerShell as Administrator",
-                    "2. Run: wsl --unregister boinc-buda-runner",
-                    "3. Run this installer again",
-                    "",
-                    "Solution 2: Manual Version Check",
-                    "1. Open PowerShell",
-                    "2. Run: wsl -d boinc-buda-runner cat /home/boinc/version.txt",
-                    "3. If you see a version number, the installation is OK",
-                    "4. If you get an error, reinstall using Solution 1",
-                    "",
-                    "Solution 3: Verify WSL Distribution",
-                    "1. Run: wsl --list --verbose",
-                    "2. Verify 'boinc-buda-runner' is listed",
-                    "3. Verify it shows 'Running' or 'Stopped' (not 'Installing')",
-                    "4. If status looks wrong, try Solution 1"
-                },
-                AdditionalResources = new List<string>
-                {
-                    "BOINC WSL Distro Documentation: https://github.com/BOINC/boinc-buda-runner-wsl"
-                }
-            };
-        }
-
         private static TroubleshootingAdvice GetNetworkErrorAdvice()
         {
             return new TroubleshootingAdvice
@@ -576,7 +465,7 @@ namespace boinc_buda_runner_wsl_installer
                 {
                     "Report Issue: https://github.com/BOINC/boinc-buda-runner-wsl-installer/issues/new",
                     "Existing Issues: https://github.com/BOINC/boinc-buda-runner-wsl-installer/issues",
-                    "BOINC Forums: https://boinc.berkeley.edu/dev/"
+                    "BOINC Forums: https://boinc.berkeley.edu/forum_index.php"
                 }
             };
         }
@@ -662,19 +551,6 @@ namespace boinc_buda_runner_wsl_installer
             if (lowerComponent.Contains("boinc") && lowerError.Contains("running"))
             {
                 return ErrorCategory.BoincRunning;
-            }
-
-            // BUDA Runner issues
-            if (lowerComponent.Contains("buda"))
-            {
-                if (lowerError.Contains("version") && (lowerError.Contains("cannot") || lowerError.Contains("unable")))
-                {
-                    return ErrorCategory.BudaRunnerVersionCheckFailed;
-                }
-                if (lowerError.Contains("failed") || lowerError.Contains("error"))
-                {
-                    return ErrorCategory.BudaRunnerInstallFailed;
-                }
             }
 
             // Network issues
