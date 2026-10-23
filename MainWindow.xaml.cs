@@ -578,7 +578,7 @@ namespace boinc_buda_runner_wsl_installer
                 if (!App.IsQuiet)
                 {
                     MessageBox.Show(
-                        "BOINC WSL Distro installation completed successfully!\n\nAll system requirements are met and BOINC WSL Distro is installed and ready to use.",
+                        "Installation completed successfully!\n\nAll system requirements are met, and the installation is ready to use.",
                         "Installation Complete",
                         MessageBoxButton.OK,
                         MessageBoxImage.Information);
