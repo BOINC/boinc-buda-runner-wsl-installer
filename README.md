@@ -12,23 +12,20 @@ The installer performs a sequence of checks and guided actions:
   - Queries the latest GitHub release of this installer and informs you if a newer version exists.
   - Note: The installer does not self-update. If an update is available, please download it from the [Releases page](https://github.com/BOINC/boinc-buda-runner-wsl-installer/releases).
 - Check Windows version
-  - Verifies that your Windows version supports WSL2.
+  - Verifies that your Windows version supports WSL.
 - Check Windows features
   - Ensures required Windows features (e.g., Virtual Machine Platform, WSL) are enabled.
   - Attempts to enable missing features. A restart may be required.
-- Check WSL installation and configuration
+- Check WSL installation
   - Installs WSL if missing, or fixes common configuration issues.
-  - Sets the default WSL version to 2.
 - Check BOINC process
   - Detects if a BOINC client is currently running. If running, you’ll be asked to stop it before continuing.
-- Check BOINC WSL Distro
-  - Installs or updates the BOINC WSL Distro to the latest version, or confirms that it’s up to date.
 
 ## Requirements
 
 - Supported OS:
   - Windows 11 (recommended)
-  - Windows 10 version 2004 (build 19041) or newer (WSL2 support required)
+  - Windows 10 version 2004 (build 19041) or newer
 - Administrator privileges
   - Enabling Windows features and installing WSL require elevation. Run the installer as Administrator.
 - Internet access
@@ -47,6 +44,8 @@ The installer performs a sequence of checks and guided actions:
 
 - `Install`
   - Starts the full check-and-install sequence described above.
+- `Uninstall`
+  - Removes the BOINC WSL Distro from your system. A confirmation dialog is shown.
 - `Exit`
   - Closes the application. A confirmation dialog is shown. The same confirmation appears when closing the window via the system close button (X).
 - `Open Log`
