@@ -37,6 +37,7 @@ namespace boinc_buda_runner_wsl_installer
         public const int ErrWslCheckOrInstallFailed = 20;
         public const int ErrBoincRunning = 30;
         public const int ErrBudaRunnerInstallFailed = 40;
+        public const int ErrIncompatibleBoincVersion = 50;
         public const int ErrUnexpected = 100;
 
         protected override async void OnStartup(StartupEventArgs e)
@@ -78,8 +79,7 @@ namespace boinc_buda_runner_wsl_installer
                 var window = new MainWindow();
 
                 // 1) Windows update check (we only inform; never stop for self-update)
-                window.ChangeRowIconAndStatus(ID.ApplicationUpdate, "BlueInfoIcon", "Checking for installer updates...");
-                await Task.Delay(10);
+                
                 await window.CheckApplicationUpdateAsync();
 
                 // 2) BOINC process must not run
@@ -89,17 +89,22 @@ namespace boinc_buda_runner_wsl_installer
                     return ErrBoincRunning;
                 }
 
-                // 3) Windows version
-                window.ChangeRowIconAndStatus(ID.WindowsVersion, "BlueInfoIcon", "Checking Windows version...");
-                await Task.Delay(10);
-                var isSupported = window.CheckWindowsVersionCompatibility();
+                // 3) BOINC version must be compatible
+                var boincVersionOk = await window.CheckBoincVersion();
+                if (!boincVersionOk)
+                {
+                    return ErrIncompatibleBoincVersion;
+                }
+
+                // 4) Windows version
+                var isSupported = await window.CheckWindowsVersionCompatibility();
                 if (!isSupported)
                 {
                     DebugLogger.LogError("Unsupported Windows version", "Headless");
                     return ErrUnsupportedWindows;
                 }
 
-                // 4) Windows features
+                // 5) Windows features
                 var featuresOk = await window.CheckWindowsFeatures();
                 if (!featuresOk)
                 {
@@ -108,7 +113,7 @@ namespace boinc_buda_runner_wsl_installer
                     return ErrWindowsFeaturesEnableFailed;
                 }
 
-                // 5) WSL check and install/fix
+                // 6) WSL check and install/fix
                 var wslOk = await window.CheckWsl();
                 if (!wslOk)
                 {
