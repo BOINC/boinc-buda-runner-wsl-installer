@@ -23,7 +23,7 @@ along with BOINC.  If not, see <http://www.gnu.org/licenses/>.
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:boinc_buda_runner_wsl_installer"
         mc:Ignorable="d"
-        Title="BOINC Linux applications support Installer - Version 3.0.1"
+        Title="BOINC Linux applications support Installer - Version 3.0.2"
         Height="450"
         Width="600">
     <Window.Resources>

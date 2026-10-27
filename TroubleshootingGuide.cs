@@ -177,18 +177,17 @@ namespace boinc_buda_runner_wsl_installer
             return new TroubleshootingAdvice
             {
                 Title = "WSL Version Needs Update",
-                Description = "Your WSL installation needs to be updated or the default version needs to be changed to WSL 2. The installer will attempt to fix this automatically.",
+                Description = "Your WSL installation needs to be updated. The installer will attempt to fix this automatically.",
                 Steps = new List<string>
                 {
-                    "The installer will automatically update WSL and set the default version to 2",
+                    "The installer will automatically update WSL",
                     "If automatic update fails, you can update manually:",
                     "",
                     "Manual Update:",
                     "1. Open PowerShell or Command Prompt as Administrator",
                     "2. Run: wsl --update",
                     "3. Wait for the update to complete",
-                    "4. Run: wsl --set-default-version 2",
-                    "5. Run this installer again"
+                    "4. Run this installer again"
                 },
                 AdditionalResources = new List<string>
                 {

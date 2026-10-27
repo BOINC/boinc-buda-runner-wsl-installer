@@ -55,6 +55,7 @@ namespace boinc_buda_runner_wsl_installer
             {
                 new TableRow { Id = ID.ApplicationUpdate, Icon = "", Status = "Check installer update", IsVisible=false },
                 new TableRow { Id = ID.BoincProcessCheck, Icon = "", Status = "Check BOINC process", IsVisible=false },
+                new TableRow { Id = ID.BoincVersionCheck, Icon = "", Status = "Check BOINC version", IsVisible=false },
                 new TableRow { Id = ID.WindowsVersion, Icon = "", Status = "Check Windows version", IsVisible=false },
                 new TableRow { Id = ID.WindowsFeatures, Icon = "", Status = "Check Windows features", IsVisible=false },
                 new TableRow { Id = ID.WslCheck, Icon = "", Status = "Check WSL installation", IsVisible=false },
@@ -87,6 +88,8 @@ namespace boinc_buda_runner_wsl_installer
                         row.Status = "Check BOINC process"; break;
                     case ID.BudaRunnerCheck:
                         row.Status = "Check BOINC WSL Distro installation"; break;
+                    case ID.BoincVersionCheck:
+                        row.Status = "Check BOINC version"; break;
                 }
             }
         }
@@ -119,9 +122,12 @@ namespace boinc_buda_runner_wsl_installer
             base.OnClosing(e);
         }
 
-        internal bool CheckWindowsVersionCompatibility()
+        internal async Task<bool> CheckWindowsVersionCompatibility()
         {
             DebugLogger.LogMethodStart("CheckWindowsVersionCompatibility", component: "MainWindow");
+
+            ChangeRowIconAndStatus(ID.WindowsVersion, "BlueInfoIcon", "Checking Windows version...");
+            await Task.Delay(10);
 
             // Check Windows version compatibility first
             var windowsInfo = WindowsVersionCheck.GetWindowsVersionInfo();
@@ -370,6 +376,51 @@ namespace boinc_buda_runner_wsl_installer
             }
         }
 
+        internal async Task<bool> CheckBoincVersion()
+        {
+            DebugLogger.LogMethodStart("CheckBoincVersion", component: "MainWindow");
+            ChangeRowIconAndStatus(ID.BoincVersionCheck, "BlueInfoIcon", "Checking for compatible BOINC version...");
+            await Task.Delay(10);
+
+            try
+            {
+                // Perform BOINC verion check
+                var boincResult = await BoincVersionCheck.CheckBoincVersionAsync();
+                DebugLogger.LogInfo($"BOINC version check completed. Status: {boincResult.Status}", "MainWindow");
+                switch (boincResult.Status)
+                {
+                    case BoincVersionCheck.BoincVersionStatus.Compatible:
+                        DebugLogger.LogInfo($"BOINC version is compatible: {boincResult.DetectedVersion}", "MainWindow");
+                        ChangeRowIconAndStatus(ID.BoincVersionCheck, "GreenCheckboxIcon", $"BOINC version is compatible: {boincResult.DetectedVersion}");
+                        DebugLogger.LogMethodEnd("CheckBoincVersion", "true (BOINC version is compatible)", "MainWindow");
+                        return true;
+                    case BoincVersionCheck.BoincVersionStatus.Incompatible:
+                        DebugLogger.LogWarning($"BOINC version is incompatible: detected {boincResult.DetectedVersion}, minimal required {boincResult.RequiredVersion}", "MainWindow");
+                        ChangeRowIconAndStatus(ID.BoincVersionCheck, "RedCancelIcon", boincResult.Message);
+                        DebugLogger.LogMethodEnd("CheckBoincVersion", "false (BOINC version is incompatible)", "MainWindow");
+                        return false;
+                    case BoincVersionCheck.BoincVersionStatus.Unknown:
+                        DebugLogger.LogWarning("BOINC version is unknown", "MainWindow");
+                        ChangeRowIconAndStatus(ID.BoincVersionCheck, "YellowExclamationIcon", boincResult.Message);
+                        DebugLogger.LogMethodEnd("CheckBoincVersion", "true (BOINC version is unknown)", "MainWindow");
+                        return true;
+                    case BoincVersionCheck.BoincVersionStatus.Error:
+                    default:
+                        DebugLogger.LogWarning($"Unable to check BOINC version: {boincResult.ErrorMessage}", "MainWindow");
+                        ChangeRowIconAndStatus(ID.BoincVersionCheck, "RedCancelIcon", boincResult.Message);
+                        DebugLogger.LogMethodEnd("CheckBoincVersion", "false (BOINC version check error)", "MainWindow");
+                        return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.LogException(ex, "Error occurred while checking BOINC version", "MainWindow");
+                ChangeRowIconAndStatus(ID.BoincVersionCheck, "RedCancelIcon", "Error occurred while checking BOINC version");
+                DebugLogger.LogMethodEnd("CheckBoincVersion", "false (exception)", "MainWindow");
+                return false;
+            }
+        }
+
         private async Task<bool> InstallWsl()
         {
             DebugLogger.LogMethodStart("InstallWsl", component: "MainWindow");
@@ -525,8 +576,6 @@ namespace boinc_buda_runner_wsl_installer
             {
                 try
                 {
-                    ChangeRowIconAndStatus(ID.ApplicationUpdate, "BlueInfoIcon", "Checking for installer updates...");
-                    await Task.Delay(50);
                     await CheckApplicationUpdateAsync();
                 }
                 catch (Exception ex)
@@ -535,9 +584,7 @@ namespace boinc_buda_runner_wsl_installer
                     DebugLogger.LogException(ex, "Self-update check failed (continuing without update)", "MainWindow");
                 }
 
-                ChangeRowIconAndStatus(ID.WindowsVersion, "BlueInfoIcon", "Checking Windows version...");
-                await Task.Delay(100);
-                var res = CheckWindowsVersionCompatibility();
+                var res = await CheckWindowsVersionCompatibility();
                 if (!res)
                 {
                     DebugLogger.LogError("Windows version is not supported", "MainWindow");
@@ -557,6 +604,21 @@ namespace boinc_buda_runner_wsl_installer
                 {
                     DebugLogger.LogError("BOINC process check failed", "MainWindow");
                     return; // failure
+                }
+
+                res = await CheckBoincVersion();
+                if (!res)
+                {
+                    DebugLogger.LogError("Incompatible BOINC version installed", "MainWindow");
+                    if (!App.IsQuiet)
+                    {
+                        MessageBox.Show(
+                            "Please update BOINC to the latest version and retry the installation.",
+                            "Incompatible BOINC Version",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Error);
+                    }
+                    return; //failure
                 }
 
                 res = await CheckWindowsFeatures();
@@ -954,6 +1016,9 @@ namespace boinc_buda_runner_wsl_installer
         internal async Task<bool> CheckApplicationUpdateAsync()
         {
             DebugLogger.LogMethodStart("CheckApplicationUpdateAsync", component: "MainWindow");
+
+            ChangeRowIconAndStatus(ID.ApplicationUpdate, "BlueInfoIcon", "Checking for installer updates...");
+            await Task.Delay(10);
 
             try
             {
