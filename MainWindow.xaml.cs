@@ -37,6 +37,28 @@ namespace boinc_buda_runner_wsl_installer
         private bool _isInstalling = false; // track if installation is in progress
         private bool _isUninstalling = false; // track if uninstallation is in progress
         internal bool LastWindowsFeaturesRestartRequired { get; private set; } // quiet-mode detail
+        public string ApplicationTitle
+        {
+            get
+            {
+                return "BOINC Linux applications support Installer";
+            }
+        }
+        public string ApplicationTitleWithVersion
+        {
+            get
+            {
+                var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
+                return $"{ApplicationTitle} - Version {version.Major + "." + version.Minor + "." + version.Build}";
+            }
+        }
+        public string ApplicationWelcomeHeader
+        {
+            get
+            {
+                return $"Welcome to the {ApplicationTitle}";
+            }
+        }
 
         public MainWindow() : this(false)
         {
@@ -224,15 +246,15 @@ namespace boinc_buda_runner_wsl_installer
                         // Some features failed to enable
                         ChangeRowIconAndStatus(ID.WindowsFeatures, "RedCancelIcon", "Failed to enable some Windows features");
                         DebugLogger.LogError("Failed to enable some required Windows features", "MainWindow");
-                        
+
                         var failedFeatures = string.Join(", ", enableResult.FeatureResults
                             .Where(f => f.Status != WindowsFeaturesCheck.WindowsFeatureStatus.Enabled)
                             .Select(f => f.FeatureName));
-                        
-                        PromptOpenIssue("Windows features enable failed", 
+
+                        PromptOpenIssue("Windows features enable failed",
                             $"Failed to enable required Windows features: {failedFeatures}. " +
                             $"Error details: {string.Join("; ", enableResult.FeatureResults.Select(f => f.Message))}");
-                        
+
                         DebugLogger.LogMethodEnd("CheckWindowsFeatures", "false (enable failed)", "MainWindow");
                         return false;
                     }
@@ -295,7 +317,7 @@ namespace boinc_buda_runner_wsl_installer
                         DebugLogger.LogError($"WSL check failed with status: {wslResult.Status}", "MainWindow");
                         ChangeRowIconAndStatus(ID.WslCheck, "RedCancelIcon", WslCheck.GetStatusDisplayMessage(wslResult));
                         DebugLogger.LogMethodEnd("CheckWsl", "false (WSL error)", "MainWindow");
-                        PromptOpenIssue("WSL check error", 
+                        PromptOpenIssue("WSL check error",
                             $"WSL Status: {wslResult.Status}\n" +
                             $"Message: {wslResult.Message}\n" +
                             $"Version Info: {wslResult.VersionInfo?.WslVersion ?? "N/A"}\n");
@@ -307,7 +329,7 @@ namespace boinc_buda_runner_wsl_installer
                 DebugLogger.LogException(ex, "Error occurred while checking WSL", "MainWindow");
                 ChangeRowIconAndStatus(ID.WslCheck, "RedCancelIcon", "Error occurred while checking WSL");
                 DebugLogger.LogMethodEnd("CheckWsl", "false (exception)", "MainWindow");
-                PromptOpenIssue("WSL check exception", 
+                PromptOpenIssue("WSL check exception",
                     $"Exception Type: {ex.GetType().Name}\n" +
                     $"Message: {ex.Message}\n" +
                     $"Stack Trace:\n{ex.StackTrace}");
@@ -465,7 +487,7 @@ namespace boinc_buda_runner_wsl_installer
                     ChangeRowIconAndStatus(ID.WslCheck, "RedCancelIcon", "Failed to install WSL");
                     DebugLogger.LogMethodEnd("InstallWsl", "false", "MainWindow");
                     // Offer to report issue
-                    PromptOpenIssue("WSL installation failed", 
+                    PromptOpenIssue("WSL installation failed",
                         $"Download URL: {downloadUrl}\n" +
                         $"Installation failed with no specific error. Check the log file for more details.");
                     return false;
@@ -477,7 +499,7 @@ namespace boinc_buda_runner_wsl_installer
                 ChangeRowIconAndStatus(ID.WslCheck, "RedCancelIcon", "WSL installation failed");
                 DebugLogger.LogMethodEnd("InstallWsl", "false (exception)", "MainWindow");
                 // Offer to report issue
-                PromptOpenIssue("WSL installation exception", 
+                PromptOpenIssue("WSL installation exception",
                     $"Exception Type: {ex.GetType().Name}\n" +
                     $"Message: {ex.Message}\n" +
                     $"Stack Trace:\n{ex.StackTrace}");
@@ -514,7 +536,7 @@ namespace boinc_buda_runner_wsl_installer
                     ChangeRowIconAndStatus(ID.WslCheck, "YellowExclamationIcon", "Some WSL issues could not be fixed automatically");
                     DebugLogger.LogMethodEnd("FixWslIssues", "false", "MainWindow");
                     // Offer to report issue
-                    PromptOpenIssue("WSL fix issues could not be resolved", 
+                    PromptOpenIssue("WSL fix issues could not be resolved",
                         $"WSL Status: {wslResult.Status}\n" +
                         $"Current Version: {wslResult.VersionInfo?.WslVersion ?? "N/A"}\n" +
                         $"Latest Version: {wslResult.LatestVersion ?? "N/A"}\n" +
@@ -529,7 +551,7 @@ namespace boinc_buda_runner_wsl_installer
                 ChangeRowIconAndStatus(ID.WslCheck, "RedCancelIcon", "Failed to fix WSL configuration");
                 DebugLogger.LogMethodEnd("FixWslIssues", "false (exception)", "MainWindow");
                 // Offer to report issue
-                PromptOpenIssue("WSL fix exception", 
+                PromptOpenIssue("WSL fix exception",
                     $"Exception Type: {ex.GetType().Name}\n" +
                     $"Message: {ex.Message}\n" +
                     $"WSL Status: {wslResult.Status}\n" +
@@ -544,9 +566,18 @@ namespace boinc_buda_runner_wsl_installer
             DebugLogger.LogSeparator("Installation Process Started");
             DebugLogger.LogMethodStart("InstallButton_Click", component: "MainWindow");
 
+            if (ExitButton != null)
+            {
+                ExitButton.Content = "Cancel";
+            }
+
             if (IntroTextBlock != null && IntroTextBlock.Visibility == Visibility.Visible)
             {
                 IntroTextBlock.Visibility = Visibility.Collapsed; // hide intro once installation begins
+            }
+            if (IntroTextBlockHeader != null && IntroTextBlockHeader.Visibility == Visibility.Visible)
+            {
+                IntroTextBlockHeader.Visibility = Visibility.Collapsed; // hide intro once installation begins
             }
 
             var installButton = sender as Button;
@@ -557,6 +588,7 @@ namespace boinc_buda_runner_wsl_installer
                 {
                     ResetInstallationSteps();
                     if (IntroTextBlock != null) IntroTextBlock.Visibility = Visibility.Collapsed; // ensure hidden on retry
+                    if (IntroTextBlockHeader != null) IntroTextBlockHeader.Visibility = Visibility.Collapsed; // hide intro once installation begins
                 }
                 installButton.IsEnabled = false;
                 DebugLogger.LogInfo("Install button disabled during execution", "MainWindow");
@@ -654,6 +686,12 @@ namespace boinc_buda_runner_wsl_installer
             finally
             {
                 _isInstalling = false; // installation ended
+
+                if (ExitButton != null)
+                {
+                    ExitButton.Content = "Finish";
+                }
+
                 if (installButton != null)
                 {
                     if (!success)
@@ -697,9 +735,18 @@ namespace boinc_buda_runner_wsl_installer
             DebugLogger.LogSeparator("Uninstallation Process Started");
             DebugLogger.LogMethodStart("UninstallButton_Click", component: "MainWindow");
 
+            if (ExitButton != null)
+            {
+                ExitButton.Content = "Cancel";
+            }
+
             if (IntroTextBlock != null && IntroTextBlock.Visibility == Visibility.Visible)
             {
                 IntroTextBlock.Visibility = Visibility.Collapsed;
+            }
+            if (IntroTextBlockHeader != null && IntroTextBlockHeader.Visibility == Visibility.Visible)
+            {
+                IntroTextBlockHeader.Visibility = Visibility.Collapsed;
             }
 
             var uninstallButton = sender as Button;
@@ -745,6 +792,8 @@ namespace boinc_buda_runner_wsl_installer
                 ChangeRowIconAndStatus(ID.BoincProcessCheck, "GreenCheckboxIcon", "BOINC is not running");
                 DebugLogger.LogInfo("BOINC process check passed, not running", "MainWindow");
 
+                var helpUrl = "https://gist.github.com/4wk-/889b26043f519259ab60386ca13ba91b";
+
                 // Step 2: Confirm with user
                 var confirmResult = MessageBox.Show(
                     "Are you sure you want to uninstall BOINC WSL Distro?\n\n" +
@@ -753,7 +802,7 @@ namespace boinc_buda_runner_wsl_installer
                     "• Any Docker-based BOINC tasks will fail after removal\n" +
                     "• WSL itself will NOT be removed\n\n" +
                     "To remove WSL completely, please refer to next documentation:\n" +
-                    "https://gist.github.com/4wk-/889b26043f519259ab60386ca13ba91b\n\n" +
+                    $"{helpUrl}\n\n" +
                     "Do you want to continue with uninstallation?",
                     "Confirm Uninstallation",
                     MessageBoxButton.YesNo,
@@ -764,7 +813,7 @@ namespace boinc_buda_runner_wsl_installer
                 if (confirmResult != MessageBoxResult.Yes)
                 {
                     DebugLogger.LogInfo("User cancelled uninstallation", "MainWindow");
-                    ChangeRowIconAndStatus(ID.BudaRunnerCheck, "GreyMinusIcon", "Uninstallation cancelled");
+                    ChangeRowIconAndStatus(ID.BudaRunnerCheck, "YellowExclamationIcon", "Uninstallation cancelled");
                     return;
                 }
 
@@ -776,7 +825,7 @@ namespace boinc_buda_runner_wsl_installer
                 if (!isInstalled)
                 {
                     DebugLogger.LogInfo("BOINC WSL Distro is not installed", "MainWindow");
-                    ChangeRowIconAndStatus(ID.BudaRunnerCheck, "GreyMinusIcon", "BOINC WSL Distro is not installed");
+                    ChangeRowIconAndStatus(ID.BudaRunnerCheck, "YellowExclamationIcon", "BOINC WSL Distro is not installed");
 
                     MessageBox.Show(
                         "BOINC WSL Distro is not installed on this system.",
@@ -811,13 +860,30 @@ namespace boinc_buda_runner_wsl_installer
                 DebugLogger.LogInfo("BOINC WSL Distro removed successfully", "MainWindow");
 
                 await Task.Delay(100);
-                MessageBox.Show(
+                confirmResult = MessageBox.Show(
                     "BOINC WSL Distro has been successfully removed from your system.\n\n" +
                     "Note: WSL itself remains installed. To remove WSL completely, please refer to:\n" +
-                    "https://gist.github.com/4wk-/889b26043f519259ab60386ca13ba91b",
+                    $"{helpUrl}\n\n" +
+                    "Click 'Yes' if you want this link to be opened in your default web browser",
                     "Uninstallation Complete",
-                    MessageBoxButton.OK,
+                    MessageBoxButton.YesNo,
                     MessageBoxImage.Information);
+                if (confirmResult == MessageBoxResult.Yes)
+                {
+                    try
+                    {
+                        Process.Start(helpUrl);
+                    }
+                    catch (Exception ex)
+                    {
+                        DebugLogger.LogException(ex, "Failed to open help URL in browser", "MainWindow");
+                        MessageBox.Show(
+                            $"Failed to open the help URL in your default browser:\n\n{ex.Message}\n\nPlease visit the following link manually:\n{helpUrl}",
+                            "Open URL Failed",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Error);
+                    }
+                }
             }
             catch (Exception ex)
             {
@@ -831,6 +897,11 @@ namespace boinc_buda_runner_wsl_installer
             finally
             {
                 _isUninstalling = false;
+
+                if (ExitButton != null)
+                {
+                    ExitButton.Content = "Finish";
+                }
 
                 if (uninstallButton != null)
                 {
@@ -889,7 +960,7 @@ namespace boinc_buda_runner_wsl_installer
                     // In quiet mode, log the troubleshooting information
                     var formattedAdvice = TroubleshootingGuide.FormatAdviceAsMessage(advice);
                     DebugLogger.LogInfo($"Troubleshooting guidance for '{title}':\n{formattedAdvice}", "MainWindow");
-                    
+
                     // Build a GitHub new issue URL with prefilled title/body for logging purposes
                     var repoNewIssueUrl = "https://github.com/BOINC/boinc-buda-runner-wsl-installer/issues/new";
 
@@ -909,14 +980,14 @@ namespace boinc_buda_runner_wsl_installer
 
                     var url = repoNewIssueUrl + "?title=" + Uri.EscapeDataString(title ?? "Installer error")
                               + "&body=" + Uri.EscapeDataString(sb.ToString());
-                    
+
                     DebugLogger.LogInfo($"Issue report URL (quiet mode): {url}", "MainWindow");
                 }
             }
             catch (Exception ex)
             {
                 DebugLogger.LogException(ex, "Failed to show troubleshooting guidance", "MainWindow");
-                
+
                 // Fallback to old behavior if troubleshooting dialog fails
                 if (!App.IsQuiet)
                 {
@@ -1006,8 +1077,7 @@ namespace boinc_buda_runner_wsl_installer
                 // Normalize similar to tag parsing
                 var dash = verStr.IndexOf('-');
                 if (dash > 0) verStr = verStr.Substring(0, dash);
-                Version v;
-                if (Version.TryParse(verStr, out v)) return v;
+                if (Version.TryParse(verStr, out Version v)) return v;
             }
             catch { }
             return null;

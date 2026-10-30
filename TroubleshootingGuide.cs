@@ -15,9 +15,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with BOINC.  If not, see <http://www.gnu.org/licenses/>.
 
-using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Text;
 
 namespace boinc_buda_runner_wsl_installer
@@ -352,7 +350,7 @@ namespace boinc_buda_runner_wsl_installer
                 },
                 AdditionalResources = new List<string>
                 {
-                    "BOINC Documentation: https://boinc.berkeley.edu/wiki/User_manual"
+                    "BOINC Documentation: https://github.com/BOINC/boinc/wiki/User-manual"
                 },
                 ShouldOfferIssueReport = false
             };
