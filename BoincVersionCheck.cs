@@ -17,10 +17,6 @@
 
 using Microsoft.Win32;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace boinc_buda_runner_wsl_installer
@@ -53,8 +49,10 @@ namespace boinc_buda_runner_wsl_installer
         public static async Task<BoincVersionCheckResult> CheckBoincVersionAsync()
         {
             DebugLogger.LogMethodStart("CheckBoincVersionAsync", component: COMPONENT);
-            var result = new BoincVersionCheckResult();
-            result.RequiredVersion = "8.2.16";
+            var result = new BoincVersionCheckResult
+            {
+                RequiredVersion = "8.2.16"
+            };
 
             try
             {

@@ -47,19 +47,6 @@ along with BOINC.  If not, see <http://www.gnu.org/licenses/>.
                 </GeometryDrawing>
             </DrawingBrush.Drawing>
         </DrawingBrush>
-        <!-- Grey minus icon -->
-        <DrawingBrush x:Key="GreyMinusIcon">
-            <DrawingBrush.Drawing>
-                <GeometryDrawing>
-                    <GeometryDrawing.Pen>
-                        <Pen Thickness="2" Brush="Gray"/>
-                    </GeometryDrawing.Pen>
-                    <GeometryDrawing.Geometry>
-                        <PathGeometry Figures="M3,8 L13,8"/>
-                    </GeometryDrawing.Geometry>
-                </GeometryDrawing>
-            </DrawingBrush.Drawing>
-        </DrawingBrush>
         <!-- Blue info icon (circle with i) -->
         <DrawingBrush x:Key="BlueInfoIcon">
             <DrawingBrush.Drawing>
