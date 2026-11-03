@@ -68,7 +68,7 @@ along with BOINC.  If not, see <http://www.gnu.org/licenses/>.
                     <TextBlock x:Name="IntroTextBlock"
                            Grid.Column="1"
                            Grid.Row="1"
-                           Text="This will install the BOINC Linux applications support, allowing BOINC to run Linux jobs based on Docker.&#x0a;&#x0a;Click Install to continue."
+                           Text="This will install the BOINC Linux support, allowing BOINC to run Linux jobs based on Docker.&#x0a;&#x0a;Click Install to continue."
                            TextAlignment="Left"
                            VerticalAlignment="Top"
                            HorizontalAlignment="Left"

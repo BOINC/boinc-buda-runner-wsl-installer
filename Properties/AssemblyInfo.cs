@@ -23,11 +23,11 @@ using System.Windows;
 // General Information about an assembly is controlled through the following
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
-[assembly: AssemblyTitle("BOINC Linux Applications Support Installer")]
+[assembly: AssemblyTitle("BOINC Linux Support Installer")]
 [assembly: AssemblyDescription("")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("University of California")]
-[assembly: AssemblyProduct("BOINC Linux Applications Support Installer")]
+[assembly: AssemblyProduct("BOINC Linux Support Installer")]
 [assembly: AssemblyCopyright("Copyright © 2026 University of California")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
@@ -64,6 +64,6 @@ using System.Windows;
 //      Build Number
 //      Revision
 //
-[assembly: AssemblyVersion("3.0.3.0")]
-[assembly: AssemblyFileVersion("3.0.3.0")]
+[assembly: AssemblyVersion("3.0.4.0")]
+[assembly: AssemblyFileVersion("3.0.4.0")]
 [assembly: NeutralResourcesLanguage("en-US")]

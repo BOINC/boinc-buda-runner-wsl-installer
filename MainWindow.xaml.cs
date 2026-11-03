@@ -41,7 +41,7 @@ namespace boinc_buda_runner_wsl_installer
         {
             get
             {
-                return "BOINC Linux applications support Installer";
+                return "BOINC Linux support Installer";
             }
         }
         public string ApplicationTitleWithVersion
@@ -669,14 +669,6 @@ namespace boinc_buda_runner_wsl_installer
 
                 await Task.Delay(100);
                 DebugLogger.LogInfo("Installation completed successfully", "MainWindow");
-                if (!App.IsQuiet)
-                {
-                    MessageBox.Show(
-                        "Installation completed successfully!\n\nAll system requirements are met, and the installation is ready to use.",
-                        "Installation Complete",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Information);
-                }
                 success = true; // mark success
             }
             catch (System.Exception ex)
@@ -825,13 +817,7 @@ namespace boinc_buda_runner_wsl_installer
                 if (!isInstalled)
                 {
                     DebugLogger.LogInfo("BOINC WSL Distro is not installed", "MainWindow");
-                    ChangeRowIconAndStatus(ID.BudaRunnerCheck, "YellowExclamationIcon", "BOINC WSL Distro is not installed");
-
-                    MessageBox.Show(
-                        "BOINC WSL Distro is not installed on this system.",
-                        "Not Installed",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Information);
+                    ChangeRowIconAndStatus(ID.BudaRunnerCheck, "GreenCheckboxIcon", "BOINC WSL Distro is not installed");
                     return;
                 }
 
