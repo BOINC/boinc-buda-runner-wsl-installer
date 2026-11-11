@@ -37,28 +37,16 @@ namespace boinc_buda_runner_wsl_installer
         private bool _isInstalling = false; // track if installation is in progress
         private bool _isUninstalling = false; // track if uninstallation is in progress
         internal bool LastWindowsFeaturesRestartRequired { get; private set; } // quiet-mode detail
-        public string ApplicationTitle
-        {
-            get
-            {
-                return "BOINC Linux support Installer";
-            }
-        }
+        public string ApplicationTitle => "BOINC Linux support installer";
         public string ApplicationTitleWithVersion
         {
             get
             {
                 var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
-                return $"{ApplicationTitle} - Version {version.Major + "." + version.Minor + "." + version.Build}";
+                return $"{ApplicationTitle} - version {version.Major + "." + version.Minor + "." + version.Build}";
             }
         }
-        public string ApplicationWelcomeHeader
-        {
-            get
-            {
-                return $"Welcome to the {ApplicationTitle}";
-            }
-        }
+        public string ApplicationWelcomeHeader => $"Welcome to the {ApplicationTitle}";
 
         public MainWindow() : this(false)
         {
@@ -702,8 +690,11 @@ namespace boinc_buda_runner_wsl_installer
                 // Re-enable Uninstall button after installation
                 if (UninstallButton != null)
                 {
-                    UninstallButton.IsEnabled = true;
-                    DebugLogger.LogInfo("Uninstall button re-enabled after installation", "MainWindow");
+                    if (!NoUninstall)
+                    {
+                        UninstallButton.IsEnabled = true;
+                        DebugLogger.LogInfo("Uninstall button re-enabled after installation", "MainWindow");
+                    }
                 }
 
                 DebugLogger.LogSeparator("Installation Process Completed");
